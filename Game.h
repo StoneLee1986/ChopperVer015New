@@ -14,6 +14,7 @@
 #include "SettingsMenu.h"
 #include "ILevel.h"
 #include "RhythmChopLevel.h"
+#include "BeatDriveLevel.h"
 
 class Game {
 public:
@@ -23,6 +24,7 @@ public:
 private:
     // 关卡类经 friend 访问 Game 的共享资源（纹理/随机/窗口/结算）
     friend class RhythmChopLevel;
+    friend class BeatDriveLevel;
 
     // ---- 主循环里的几个阶段 ----
     void processEvents();                 // ① 读键盘/鼠标输入
@@ -49,9 +51,10 @@ private:
     void loadAssets();      // 一次性加载所有纹理、字体、音效
     void initScene();       // 把每个精灵摆好初始位置
 
-    // ---- 关卡策略（唯一关卡完全自包含：背景/树/小人/判定位置都在关卡内） ----
-    ILevel* m_level = nullptr;            // 当前激活的关卡
-    RhythmChopLevel  m_levelRhythm;       // 关卡1·节奏鼓点（唯一关卡）
+    // ---- 关卡策略（两个关卡完全自包含：背景/树/小人/判定位置都在关卡内，零共享可变状态） ----
+    ILevel* m_level = nullptr;            // 当前激活的关卡（startNewGame/enterStage 按 mode 绑定）
+    RhythmChopLevel m_levelRhythm;        // 关卡 A · 021 砍树驱动（回归原版砍树逻辑）
+    BeatDriveLevel  m_levelBeat;          // 关卡 B · 020 鼓点驱动（鼓点驱动下落 + A/B字母）
 
     // ---- 随机数引擎 ----
     std::mt19937 m_rng;    // 梅森旋转随机引擎，比 srand/rand 质量高

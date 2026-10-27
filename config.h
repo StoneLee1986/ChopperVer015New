@@ -93,8 +93,8 @@ namespace config {
     constexpr float AXE_SCALE       = 1.6f;      // 斧头放大（152x28 偏小，放大才醒目）
     constexpr float AXE_EMBED_ROT    = 30.0f;    // 嵌在树上时斧头角度(度,左)
 
-    // ---- 关卡/玩法模式（当前单一关卡：节奏鼓点；保留枚举与层级，未来加关卡再加值） ----
-    enum class GameMode { ChopRhythm };  // 关卡1·节奏鼓点（唯一关卡）
+    // ---- 关卡/玩法模式（两个独立关卡并存：021 砍树驱动 / 020 鼓点驱动，各自完全自包含） ----
+    enum class GameMode { ChopRhythm, BeatDrive };  // ChopRhythm=021砍树驱动 / BeatDrive=020鼓点驱动
 
     // ---- 关卡3·节奏鼓点：节拍器驱动的音游砍树（独立于 MusicSystem 的下落音符机制） ----
     // 每拍鼓声 tick：树枝下落一格 + 字母提示 + 玩家在鼓声瞬间按对方向键
@@ -102,6 +102,9 @@ namespace config {
     constexpr int    RHYTHM_DRUM_BEATS      = 32;      // 合成鼓声总拍数（播完＝通关；32 拍≈32 秒）
     constexpr int    RHYTHM_BRANCH_COUNT    = 6;       // 树枝槽位数（从顶部走 6 格到玩家层，对齐原版砍树）
     constexpr float  RHYTHM_BRANCH_SPACING  = 150.0f;  // 相邻槽位垂直间距（6 格：0…750，最底=玩家层）
+    // 关卡B专用：树枝整体 Y 偏移，使压死层(最底槽)视觉贴近并压住小人头顶(720)，产生压迫感。
+    // 关卡A(砍树驱动)未用此偏移，保持原版坐标。
+    constexpr float  RHYTHM_BRANCH_Y_OFFSET = -75.0f;
     // 树枝生成概率接口（默认 左45/右45/无10，可随难度改写 m_pLeft/Right/None）
     constexpr float  RHYTHM_P_LEFT          = 0.45f;
     constexpr float  RHYTHM_P_RIGHT         = 0.45f;

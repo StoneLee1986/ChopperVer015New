@@ -1,0 +1,350 @@
+// CHOPPER - BeatDriveLevel 关卡B·鼓点驱动下落(020) 实现
+#include "Game.h"
+#include <algorithm>   // std::min
+
+BeatDriveLevel::BeatDriveLevel(Game& g) : m_game(g), m_scenery(g.m_rng) {}
+
+// 一次性初始化：合成鼓声 + 建提示框/固定文字/字母/判定/连击 UI
+void BeatDriveLevel::initScene() {
+    synthDrum();       // 程序合成 60BPM 规律鼓声
+    synthFailSound();  // 程序合成失败音效（柔和下行提示音）
+    // 本关场景元素（完全自包含，不再由 Game 全局共用）：背景/树/小人
+    m_scenery.init(m_game.m_texBackground, m_game.m_texCloud, m_game.m_texBee);
+    m_player.init(m_game.m_texPlayer, m_game.m_texRip);
+    m_tree.setTexture(m_game.m_texTree);
+    m_tree.setOrigin(150.0f, 900.0f);   // 锚点贴图底部中心（静态完整树）
+    m_tree.setPosition(config::TREE_ANCHOR_X, config::TREE_GROUND_Y);
+    // 复现原版砍树动作（timber.cpp）：斧头瞬移换侧 + 单块圆木向反侧飞出
+    m_axeSpr.setTexture(m_game.m_texAxe);
+    // 按原版：无缩放/无旋转/锚点左上角(默认)，砍击时瞬移到对应侧
+    m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头初始隐藏（砍击时才瞬移出现）
+    m_logSpr.setTexture(m_game.m_texLog);
+    m_logSpr.setOrigin(150.0f, 60.0f);               // 锚点居中（同关卡1 圆木）
+    m_logSpr.setScale(config::RHYTHM_LOG_SCALE, config::RHYTHM_LOG_SCALE);   // 原版整块太大，缩小
+    m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 初始藏到屏幕外
+
+    // 按键提示框（右半边靠下，半透明底 + 亮色描边，风格对齐现有判定框）
+    m_hintBox.setSize(Vector2f(config::HINT_BOX_W, config::HINT_BOX_H));
+    m_hintBox.setPosition(config::HINT_BOX_X, config::HINT_BOX_Y);
+    m_hintBox.setFillColor(Color(0, 0, 0, 120));          // 半透明黑底，不遮挡树枝/树
+    m_hintBox.setOutlineThickness(3.0f);
+    m_hintBox.setOutlineColor(Color(255, 215, 0, 220));   // 亮金描边
+
+    // 固定提示行（双语，渲染时每帧重设以实时跟随语言切换）
+    m_hintFixed.setFont(m_game.m_font);
+    m_hintFixed.setCharacterSize(config::HINT_FONT_SIZE);
+    m_hintFixed.setFillColor(Color::White);
+
+    // A/B 大号字母
+    m_letterText.setFont(m_game.m_font);
+    m_letterText.setCharacterSize(config::HINT_LETTER_SIZE);
+    m_letterText.setFillColor(Color::White);
+
+    // 判定文字 / 连击文字（放屏幕中央偏上，避免与树身/树枝重叠）
+    m_judgeText.setFont(m_game.m_font);
+    m_judgeText.setCharacterSize(80);
+    m_judgeText.setFillColor(Color::Yellow);
+    centerText(m_judgeText, config::SCREEN_CENTER_X, 320.0f);
+    m_comboText.setFont(m_game.m_font);
+    m_comboText.setCharacterSize(50);
+    m_comboText.setFillColor(Color::White);
+    centerText(m_comboText, config::SCREEN_CENTER_X, 400.0f);
+}
+
+// 每局开始：复位全部状态 + 从头播放鼓声
+void BeatDriveLevel::onStart() {
+    for (Side& b : m_branches) b = Side::None;   // 6 槽树枝清空
+    m_player.reset();        // 小人回左边、墓碑藏起来（本关自控位置）
+    m_playerSide   = Side::Left;                 // 小人回左边
+    m_letterActive = false;
+    m_letterT      = 0.0f;
+    m_score = 0; m_combo = 0; m_maxCombo = 0;
+    m_timeRemaining = config::START_TIME;
+    m_currentBeat = 0;
+    m_cleared = false; m_dead = false;
+    m_logActive = false;   // 圆木复位（隐藏）
+    m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
+    m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头开局隐藏（砍击时才出现）
+    m_drum.stop();
+    m_drum.play();   // 从头播放鼓声（getPlayingOffset 作 tick 基准）
+}
+
+// 玩家按键：更新站位 + 以鼓声时刻为基准判定（Perfect/Good/Miss）
+void BeatDriveLevel::handleInput(Side side) {
+    m_playerSide = side;   // 小人移动到该侧（站位决定撞死判定）
+    m_player.onSide(side); // 小人精灵切到对应一侧（本关自控站位）
+    // 斧头始终跟随玩家所在侧（原版：砍就换侧；即使时机失误也瞬移，不留在原处）
+    m_axeSpr.setPosition(side == Side::Left ? config::RHYTHM_AXE_LEFT_X : config::RHYTHM_AXE_RIGHT_X,
+                         config::RHYTHM_AXE_Y);
+
+    // 玩家按对(移到反侧)躲开即将压到的那根树枝(index4)：它已用过，立即消失，避免停在玩家层干扰
+    const int  pending  = config::RHYTHM_BRANCH_COUNT - 2;
+    const Side incoming = m_branches[pending];
+    if (incoming != Side::None && incoming != side)
+        m_branches[pending] = Side::None;   // 躲开 → 该树枝立即清除（红框随之消失）
+
+    const float now  = m_drum.getPlayingOffset().asSeconds();
+    const float beat = 60.0f / config::RHYTHM_BPM;
+    const float nearest = std::round(now / beat) * beat;   // 最近的鼓声拍
+    const float diff    = std::fabs(now - nearest);
+    if (diff <= config::NOTE_GOOD_WINDOW) {                 // 在判定窗口内按＝命中
+        const bool perfect = diff <= config::NOTE_PERFECT_WINDOW;
+        ++m_combo;
+        if (m_combo > m_maxCombo) m_maxCombo = m_combo;
+        m_score += perfect ? 100 : 50;
+        m_timeRemaining = std::min(config::START_TIME, m_timeRemaining + config::HIT_TIME_BONUS);
+        setJudge(perfect ? "完美" : "好", perfect ? "PERFECT" : "GOOD",
+                 perfect ? Color::Yellow : Color::Green);
+        m_game.m_sound.play();   // 命中打击音效（chop.wav）
+        // 复现原版砍树（timber.cpp）：单块圆木向反侧飞出（仅在命中时）
+        m_logSpr.setPosition(config::TREE_X, config::RHYTHM_LOG_Y);          // 圆木从树心出发
+        m_logVx = (side == Side::Left ? 1.0f : -1.0f) * config::RHYTHM_LOG_VX;  // 砍左→向右飞、砍右→向左飞
+        m_logVy = config::RHYTHM_LOG_VY;                                          // 原版向上初速
+        m_logActive = true;
+    } else {                                               // 远离鼓声拍＝时机失误
+        m_combo = 0;
+        m_timeRemaining -= config::MISS_TIME_PENALTY;
+        setJudge("失误", "MISS", Color::Red);
+    }
+}
+
+// 每帧推进：节拍 tick + 树枝下落 + 字母动画 + 时间条 + 碰撞/结束判定
+void BeatDriveLevel::update(float dt) {
+    if (m_dead || m_cleared) return;   // 已结束不再推进
+
+    const float beat = 60.0f / config::RHYTHM_BPM;
+    const float now  = m_drum.getPlayingOffset().asSeconds();
+
+    // 鼓声播完＝通关（currentBeat 已走满且 Sound 停）
+    if (m_currentBeat >= config::RHYTHM_DRUM_BEATS &&
+        m_drum.getStatus() == Sound::Stopped) {
+        m_cleared = true;
+        doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
+        return;
+    }
+
+    // 跨拍检测：每过一拍触发一次"树枝下落 + 新枝生成 + 字母"（与鼓声同步）
+    while (m_currentBeat < config::RHYTHM_DRUM_BEATS &&
+           now >= (m_currentBeat + 1) * beat) {
+        ++m_currentBeat;
+        advanceBranches();
+        checkCollision();      // 撞死会置 m_dead 并结算
+        if (m_dead) return;
+    }
+
+    // 字母动画推进（一拍内：淡入 → 脉冲回弹 → 淡出）
+    if (m_letterActive) {
+        m_letterT += dt / beat;
+        if (m_letterT >= 1.0f) m_letterActive = false;
+    }
+
+    // 砍树动作推进：圆木按水平+垂直初速飞出（原版：水平∓5000 + 向上-1500，无重力）
+    if (m_logActive) {
+        m_logSpr.move(m_logVx * dt, m_logVy * dt);
+        if (m_logSpr.getPosition().x < -100.0f || m_logSpr.getPosition().x > 2000.0f)
+            m_logActive = false;   // 飞出左右屏幕边界即停（原版 LOG_OFFSCREEN）
+    }
+
+    // 背景装饰推进：云 + 蜜蜂漂移（本关自持场景元素）
+    m_scenery.update(sf::seconds(dt));
+
+    // 时间条自然衰减
+    m_timeRemaining -= config::TIME_DECAY_PER_SEC * dt;
+    if (m_timeRemaining < 0.0f) m_timeRemaining = 0.0f;
+    if (m_timeRemaining <= 0.0f) {
+        doGameOver(tr("时间到！！", "Out of time!!"), true);
+        return;
+    }
+
+    // 连击文字（>1 才显示）
+    if (m_combo > 1) {
+        m_comboText.setString("x" + std::to_string(m_combo));
+        m_comboText.setFillColor(Color::White);
+        centerText(m_comboText, config::SCREEN_CENTER_X, 400.0f);
+    } else {
+        m_comboText.setString("");
+    }
+}
+
+// 一拍：全部槽位下移一格 + 顶部按概率生成新枝 + 决定本拍字母
+void BeatDriveLevel::advanceBranches() {
+    for (int i = config::RHYTHM_BRANCH_COUNT - 1; i > 0; --i)
+        m_branches[i] = m_branches[i - 1];   // 下移一格
+
+    // 顶部按概率接口生成新枝（关卡 B 默认 左50/右50/无0）
+    const int r  = static_cast<int>(m_game.m_rng() % 1000);
+    const int l  = static_cast<int>(m_pLeft  * 1000.0f);
+    const int rp = static_cast<int>(m_pRight * 1000.0f);
+    if      (r < l)              m_branches[0] = Side::Left;
+    else if (r < l + rp)         m_branches[0] = Side::Right;
+    else                         m_branches[0] = Side::None;
+
+    // 字母提示 = 即将压到玩家的树枝（index4，下一拍进入玩家层 index5）的反侧：
+    // 该枝在左→提示按右(B)、在右→提示按左(A)、该槽无枝→不显示（进度清零）
+    const int pending = config::RHYTHM_BRANCH_COUNT - 2;   // 即将进入玩家层的槽位（6槽→index4）
+    if      (m_branches[pending] == Side::Left)  { m_letterActive = true; m_letterSide = Side::Right; m_letterT = 0.0f; }
+    else if (m_branches[pending] == Side::Right) { m_letterActive = true; m_letterSide = Side::Left;  m_letterT = 0.0f; }
+    else { m_letterActive = false; m_letterT = 0.0f; }   // 该槽无枝：绝无字母出现
+}
+
+// 碰撞：最底层(玩家层)树枝与玩家同侧 → 被压死（树枝撞到玩家，原版判定）
+void BeatDriveLevel::checkCollision() {
+    const Side bottom = m_branches[config::RHYTHM_BRANCH_COUNT - 1];
+    if (bottom != Side::None && bottom == m_playerSide) {
+        m_dead = true;
+        m_player.die(m_playerSide);   // 压死视觉：小人移出屏幕、墓碑留在被压那一侧
+        doGameOver(tr("你被压死了！", "SQUISHED!"), true);
+    }
+}
+
+// 结束本局（死亡/时间到/通关）：停帧 + 提示 + 失败音效(可选) + 上榜结算
+void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
+    m_game.m_paused = true;
+    m_game.setMessage(msg);
+    if (playFailSound) {
+        m_fail.play();
+        // 失败（压死/时间到）统一让斧头/圆木消失，避免残留画面
+        m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
+        m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
+        m_logActive = false;
+    }
+    m_drum.stop();
+    if (m_game.m_scoreboard.qualifiesForHighscore(m_score)) {
+        m_game.m_enterNamePending = true;
+        m_game.m_gameOverClock.restart();
+    }
+}
+
+// 画本关全部场景（背景/云/蜜蜂 → 树 → 树枝 → 小人/墓碑 → 圆木 → 斧头）
+void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
+    m_scenery.render(w);   // 背景 + 云 + 蜜蜂（最底层）
+    w.draw(m_tree);        // 树（静态完整树，本关自持）
+
+    // 下落中的树枝（长在树上，画在树前）
+    const int pending = config::RHYTHM_BRANCH_COUNT - 2;   // 字母对应的树枝 = 即将压到玩家的槽位(index4)
+    for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {
+        if (m_branches[i] == Side::None) continue;
+        Sprite branch(m_game.m_texBranch);
+        branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
+        // 原版树枝无缩放：440 宽、锚点中心，无缩放时端部正好贴住树身（左→830/右→1110）
+        // 加 RHYTHM_BRANCH_Y_OFFSET：让压死层(最底槽)贴近小人头顶，消除"树枝远离玩家"的视觉空隙
+        const float y = i * config::RHYTHM_BRANCH_SPACING + config::RHYTHM_BRANCH_Y_OFFSET;
+        if (m_branches[i] == Side::Left) { branch.setPosition(config::NOTE_LEFT_X, y); branch.setRotation(180.0f); }
+        else                              { branch.setPosition(config::NOTE_RIGHT_X, y); branch.setRotation(0.0f); }
+        w.draw(branch);
+
+        // 校对红框：框住字母对应的那根树枝(index4)，粗红框，明暗节奏与字母完全同步（同相位闪烁）
+        if (i == pending && m_letterActive) {
+            const sf::Vector2u tsz = m_game.m_texBranch.getSize();
+            const float margin = 12.0f;
+            RectangleShape box(Vector2f(tsz.x + 2.0f * margin, tsz.y + 2.0f * margin));
+            box.setPosition(branch.getPosition().x - config::BRANCH_ORIGIN_X - margin,
+                            branch.getPosition().y - config::BRANCH_ORIGIN_Y - margin);
+            box.setFillColor(Color::Transparent);
+            box.setOutlineThickness(6.0f);   // 粗框，防不明显
+            // 与字母相同的淡入/保持/淡出相位 → 与字母同频率闪烁
+            float a = 255.0f;
+            if      (m_letterT < 0.10f) a = 255.0f * (m_letterT / 0.10f);
+            else if (m_letterT < 0.60f) a = 255.0f;
+            else                        a = 255.0f * (1.0f - (m_letterT - 0.60f) / 0.40f);
+            box.setOutlineColor(Color(255, 0, 0, static_cast<sf::Uint8>(a)));
+            w.draw(box);
+        }
+    }
+
+    if (m_logActive) w.draw(m_logSpr);   // 单块圆木水平飞出（原版砍树反馈）
+    m_player.render(w);                  // 小人 + 墓碑
+    w.draw(m_axeSpr);                    // 斧头（瞬移到玩家砍击侧）
+}
+
+// 画按键提示 UI（提示框 + 固定文字 + A/B 字母 + 判定/连击），画在分数/时间条附近
+void BeatDriveLevel::renderUI(sf::RenderWindow& w) {
+    w.draw(m_hintBox);
+
+    // 固定提示行（双语，每帧重设以实时跟随语言切换）
+    m_hintFixed.setString(tr("A 按左   B 按右", "A=LEFT   B=RIGHT"));
+    centerText(m_hintFixed, config::HINT_BOX_X + config::HINT_BOX_W / 2.0f, config::HINT_BOX_Y + 45.0f);
+    w.draw(m_hintFixed);
+
+    // A/B 字母：鼓响瞬间放大回弹 + 淡入淡出（perfect 时机提示）
+    if (m_letterActive) {
+        m_letterText.setString(m_letterSide == Side::Right ? "B" : "A");
+        float scale = 1.0f;
+        if (m_letterT < 0.15f)   // 0~0.15s：从最大快速回落到 1.0（鼓响瞬间脉冲）
+            scale += config::HINT_LETTER_PULSE * (1.0f - m_letterT / 0.15f);
+        m_letterText.setScale(scale, scale);
+        float a = 255.0f;
+        if      (m_letterT < 0.10f) a = 255.0f * (m_letterT / 0.10f);          // 淡入
+        else if (m_letterT < 0.60f) a = 255.0f;                                 // 保持
+        else                         a = 255.0f * (1.0f - (m_letterT - 0.60f) / 0.40f); // 淡出
+        m_letterText.setFillColor(Color(255, 255, 255, static_cast<sf::Uint8>(a)));
+        centerText(m_letterText, config::HINT_BOX_X + config::HINT_BOX_W / 2.0f, config::HINT_BOX_Y + 125.0f);
+        w.draw(m_letterText);
+    }
+
+    if (m_judgeClock.getElapsedTime().asSeconds() < 1.0f) w.draw(m_judgeText);
+    if (m_combo > 1)                                       w.draw(m_comboText);
+}
+
+// ============================================================================
+//  私有辅助
+// ============================================================================
+
+// 程序合成 60BPM 规律鼓声（节拍器"咚"，每拍一个低频短脉冲；无需外部音频文件）
+void BeatDriveLevel::synthDrum() {
+    const float beat = 60.0f / config::RHYTHM_BPM;               // 一拍 = 1.0s
+    const float total = config::RHYTHM_DRUM_BEATS * beat;        // 整段时长
+    const int frames = static_cast<int>(total * config::SAMPLE_RATE);
+    std::vector<Int16> samples(frames, 0);
+    const int pulseLen = static_cast<int>(0.18f * config::SAMPLE_RATE);  // 每个"咚"约 0.18s
+    for (int k = 0; k < config::RHYTHM_DRUM_BEATS; ++k) {
+        const int start = static_cast<int>(k * beat * config::SAMPLE_RATE);
+        for (int j = 0; j < pulseLen && start + j < frames; ++j) {
+            const double t     = j / static_cast<double>(config::SAMPLE_RATE);
+            const double env   = std::exp(-t * 28.0);            // 快速衰减包络（鼓点感）
+            const double phase = 6.283185307 * 150.0 * t;        // 150Hz 低频"咚"
+            samples[start + j] = static_cast<Int16>(9000.0 * env * std::sin(phase));
+        }
+    }
+    if (!m_drumBuffer.loadFromSamples(samples.data(), static_cast<sf::Uint64>(samples.size()),
+                                      1, config::SAMPLE_RATE))
+        std::cerr << "[Warning] 节奏鼓点合成失败\n";
+    m_drum.setBuffer(m_drumBuffer);
+}
+
+// 程序合成失败音效：柔和下行三连音（G4→E4→C4），替代全局难听的死亡音效（仅本关用）
+void BeatDriveLevel::synthFailSound() {
+    const float freqs[3] = { 392.0f, 330.0f, 262.0f };   // G4 → E4 → C4 下行提示
+    const float noteLen = 0.12f;                          // 每个音 0.12s
+    const int frames = static_cast<int>((3 * noteLen + 0.05f) * config::SAMPLE_RATE);
+    std::vector<Int16> samples(frames, 0);
+    for (int n = 0; n < 3; ++n) {
+        const int start = static_cast<int>(n * noteLen * config::SAMPLE_RATE);
+        const int len   = static_cast<int>(noteLen * config::SAMPLE_RATE);
+        for (int j = 0; j < len && start + j < frames; ++j) {
+            const double t     = j / static_cast<double>(config::SAMPLE_RATE);
+            const double env   = 1.0 - static_cast<double>(j) / len;   // 线性衰减
+            const double phase = 6.283185307 * freqs[n] * t;
+            samples[start + j] = static_cast<Int16>(5000.0 * env * std::sin(phase));
+        }
+    }
+    if (!m_failBuffer.loadFromSamples(samples.data(), static_cast<sf::Uint64>(samples.size()),
+                                      1, config::SAMPLE_RATE))
+        std::cerr << "[Warning] 失败音效合成失败\n";
+    m_fail.setBuffer(m_failBuffer);
+}
+
+// 把文字中心放到 (x,y)
+void BeatDriveLevel::centerText(Text& t, float x, float y) {
+    const FloatRect rect = t.getLocalBounds();
+    t.setOrigin(rect.left + rect.width / 2.0f, rect.top + rect.height / 2.0f);
+    t.setPosition(x, y);
+}
+
+// 刷新判定文字
+void BeatDriveLevel::setJudge(const char* zh, const char* en, Color c) {
+    m_judgeText.setString(tr(zh, en));
+    m_judgeText.setFillColor(c);
+    centerText(m_judgeText, config::SCREEN_CENTER_X, 320.0f);
+    m_judgeClock.restart();
+}

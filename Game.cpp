@@ -2,7 +2,8 @@
 #include "Game.h"
 
 Game::Game()
-    : m_levelRhythm(*this),        // 关卡1·节奏鼓点（唯一关卡，完全自包含）
+    : m_levelRhythm(*this),        // 关卡 A · 021 砍树驱动
+      m_levelBeat(*this),          // 关卡 B · 020 鼓点驱动
       m_rng(std::random_device{}()) {   // 用真随机种子初始化随机引擎
 
     m_disp.init();     // 读配置 + 建窗（窗口/视图/显示状态全在 DisplayManager）
@@ -89,7 +90,7 @@ void Game::run() {
             m_gameOverClock.getElapsedTime().asSeconds() >= config::GAME_OVER_DELAY) {
             m_enterNamePending = false;
             // 携带本局分数上榜（分数在关卡内自持）
-            m_nameUI.begin(m_levelRhythm.score());
+            m_nameUI.begin(m_level->score());
         }
         if (!m_paused && !m_escPaused && !m_inMenu && !m_inPauseMenu && !m_confirmExit
             && !m_scoreboard.isOpen() && !m_nameUI.isActive() && !m_settingsMenu.isOpen()) {  // 不在任何菜单/输入/确认、没暂停才更新
@@ -261,10 +262,11 @@ void Game::processEvents() {
             m_enterHeld = true;
             if (m_inMenu) {
                 if (m_inStageSelect) {
-                    // ---- 关卡选择子菜单（2 项：关卡1·节奏鼓点 / 返回主菜单） ----
+                    // ---- 关卡选择子菜单（3 项：关卡A·砍树驱动 / 关卡B·鼓点驱动 / 返回主菜单） ----
                     switch (m_menuSelection) {
-                        case 0: enterStage(config::GameMode::ChopRhythm); break; // 关卡1 · 节奏鼓点（唯一关卡）
-                        case 1:   // 返回主菜单
+                        case 0: enterStage(config::GameMode::ChopRhythm); break; // 关卡 A · 021 砍树驱动
+                        case 1: enterStage(config::GameMode::BeatDrive);  break; // 关卡 B · 020 鼓点驱动
+                        case 2:   // 返回主菜单
                             m_inStageSelect = false;
                             setupMenu(MenuKind::Main);
                             break;
@@ -332,7 +334,7 @@ void Game::processEvents() {
         const bool down = Keyboard::isKeyPressed(Keyboard::Down);
         if ((up || down) && !m_menuInputHeld) {
             m_menuInputHeld = true;
-            const int count = m_inMenu ? (m_inStageSelect ? 2 : 5) : 4; // 主菜单5项/关卡选择2项/暂停4项
+            const int count = m_inMenu ? (m_inStageSelect ? 3 : 5) : 4; // 主菜单5项/关卡选择3项/暂停4项
             if (up)   m_menuSelection = (m_menuSelection + count - 1) % count; // 上移
             if (down) m_menuSelection = (m_menuSelection + 1) % count;         // 下移
         } else if (!up && !down) {
@@ -346,7 +348,7 @@ void Game::processEvents() {
         const bool left  = Keyboard::isKeyPressed(Keyboard::Left);
         if (right || left) {
             const Side side = right ? Side::Right : Side::Left;
-            m_levelRhythm.handleInput(side);   // 关卡内：更新站位 + 鼓声时刻判定 + 砍树反馈
+            m_level->handleInput(side);   // 关卡内：更新站位 + 鼓声时刻判定 + 砍树反馈
             m_acceptInput = false;   // 锁住输入，等按键松开再解锁（避免按住连判）
         }
     }
@@ -367,9 +369,11 @@ void Game::startNewGame(config::GameMode mode) {
     m_escHeld   = false; // 同时清掉 Esc 边沿检测标志
     m_acceptInput = true; // 可以开始按方向键了
 
-    // ---- 关卡状态复位：绑定唯一关卡并调用其 onStart（背景/树/小人/鼓声全在关卡内复位） ----
-    m_level = static_cast<ILevel*>(&m_levelRhythm);
-    m_levelRhythm.onStart();
+    // ---- 关卡状态复位：按 mode 绑定当前关卡并调用其 onStart（背景/树/小人/鼓声全在关卡内复位） ----
+    switch (mode) {
+        case config::GameMode::ChopRhythm: m_level = &m_levelRhythm; m_levelRhythm.onStart(); break;
+        case config::GameMode::BeatDrive:  m_level = &m_levelBeat;   m_levelBeat.onStart();   break;
+    }
 }
 
 // 进入某关的"按回车开始"准备界面（主菜单/关卡选择共用）：停在提示，按 Enter 才真正开局
@@ -378,9 +382,11 @@ void Game::enterStage(config::GameMode mode) {
     m_inMenu        = false;
     m_inStageSelect = false;
     m_paused        = true;   // 停在"按 Enter 开始"，不推进游戏
-    // 绑定唯一关卡并复位其状态（准备界面与开局渲染都需要 m_level 非空；背景/树/小人/墓碑在关卡 onStart 内复位）
-    m_level = static_cast<ILevel*>(&m_levelRhythm);
-    m_levelRhythm.onStart();
+    // 按 mode 绑定当前关卡并复位其状态（准备界面与开局渲染都需要 m_level 非空；背景/树/小人/墓碑在关卡 onStart 内复位）
+    switch (mode) {
+        case config::GameMode::ChopRhythm: m_level = &m_levelRhythm; m_levelRhythm.onStart(); break;
+        case config::GameMode::BeatDrive:  m_level = &m_levelBeat;   m_levelBeat.onStart();   break;
+    }
     setMessage(tr("按回车开始", "Press Enter to Start"));
 }
 
@@ -407,7 +413,7 @@ void Game::centerText(Text& t, float x, float y) {
 // ============================================================================
 // 填某类菜单的选项文字并返回选项数（语言刷新/进入菜单共用）；同时设置菜单顶部标题
 int Game::fillMenuText(Game::MenuKind kind) {
-    const int count = (kind == MenuKind::Pause) ? 4 : (kind == MenuKind::StageSelect ? 2 : 5);
+    const int count = (kind == MenuKind::Pause) ? 4 : (kind == MenuKind::StageSelect ? 3 : 5);
     sf::String labels[5];
     if (kind == MenuKind::Pause) {
         labels[0] = tr("继续", "RESUME");
@@ -416,8 +422,9 @@ int Game::fillMenuText(Game::MenuKind kind) {
         labels[3] = tr("返回主菜单", "BACK TO MENU");
     } else if (kind == MenuKind::StageSelect) {
         m_menuTitle.setString(tr("选择关卡", "SELECT STAGE"));
-        labels[0] = tr("关卡1 · 节奏鼓点", "STAGE 1 · RHYTHM CHOP");
-        labels[1] = tr("返回主菜单", "BACK TO MENU");
+        labels[0] = tr("关卡A · 砍树驱动", "STAGE A · CHOP DRIVE");
+        labels[1] = tr("关卡B · 鼓点驱动", "STAGE B · BEAT DRIVE");
+        labels[2] = tr("返回主菜单", "BACK TO MENU");
     } else {   // 主菜单
         m_menuTitle.setString("CHOPPER");
         labels[0] = tr("开始新游戏", "NEW GAME");
@@ -457,7 +464,7 @@ void Game::applyLanguage() {
     centerText(m_confirmOptions[0], config::SCREEN_CENTER_X - 150.0f, 550.0f);
     centerText(m_confirmOptions[1], config::SCREEN_CENTER_X + 150.0f, 550.0f);
     // 分数前缀（分数在关卡内自持）
-    m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(m_levelRhythm.score()));
+    m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(m_level->score()));
 
     // 各子界面文字按当前语言刷新
     m_settingsMenu.applyLanguage();
@@ -474,10 +481,10 @@ void Game::checkLanguage() {
     }
 }
 
-// 背景声统一分发：唯一关卡自持鼓声（Esc 暂停/暂停菜单共用）
-void Game::pauseBgm() { m_levelRhythm.pause(); }
-void Game::resumeBgm(){ m_levelRhythm.resume(); }
-void Game::stopBgm()  { m_levelRhythm.stop(); }
+// 背景声统一分发：当前关卡自持鼓声（Esc 暂停/暂停菜单共用）
+void Game::pauseBgm() { if (m_level) m_level->pause(); }
+void Game::resumeBgm(){ if (m_level) m_level->resume(); }
+void Game::stopBgm()  { if (m_level) m_level->stop(); }
 
 void Game::alignRow(Text& t, float x, float y, int mode) {
     const FloatRect r = t.getLocalBounds();
@@ -488,12 +495,13 @@ void Game::alignRow(Text& t, float x, float y, int mode) {
 }
 
 void Game::update(const Time& dt) {
-    // 唯一关卡完全自包含：节拍tick/树枝/字母/圆木/背景/时间/碰撞/结算全在关卡内
-    m_levelRhythm.update(dt.asSeconds());
+    if (!m_level) return;   // 未进入关卡（防御性保护；正常 update 只在游戏阶段调用，m_level 已绑定）
+    // 当前关卡完全自包含：节拍tick/树枝/字母/圆木/背景/时间/碰撞/结算全在关卡内
+    m_level->update(dt.asSeconds());
     // 时间条与分数由关卡数值驱动
-    m_timeBar.setSize(Vector2f(m_levelRhythm.timeBarWidthPerSecond() * m_levelRhythm.timeRemaining(),
+    m_timeBar.setSize(Vector2f(m_level->timeBarWidthPerSecond() * m_level->timeRemaining(),
                                config::TIME_BAR_HEIGHT));
-    m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(m_levelRhythm.score()));
+    m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(m_level->score()));
 }
 
 // （关卡1/2 与 MusicSystem 的逻辑已随重构删除，Game 只做框架 + 调度唯一关卡）
@@ -553,7 +561,7 @@ void Game::render() {
     }
     if (m_inMenu) {
         // ---- 主菜单 / 关卡选择界面：纯黑背景 + 菜单 + 顶部标题 ----
-        const int count = m_inStageSelect ? 2 : 5;
+        const int count = m_inStageSelect ? 3 : 5;
         m_disp.window().draw(m_menuTitle);
         for (int i = 0; i < count; ++i) {
             m_menuOptions[i].setFillColor(i == m_menuSelection ? Color::Yellow : Color::White);
@@ -618,6 +626,7 @@ void Game::loadAssets() {
 //  场景初始化：把每个精灵贴上纹理、摆好初始位置
 // ============================================================================
 void Game::initScene() {
-    // 关卡专属精灵初始化（背景/树/小人/鼓声/斧头/圆木/提示框全在关卡内 initScene）
+    // 两个关卡各自初始化（背景/树/小人/鼓声/斧头/圆木/提示框全在关卡内 initScene，互不共享可变状态）
     m_levelRhythm.initScene();
+    m_levelBeat.initScene();
 }
