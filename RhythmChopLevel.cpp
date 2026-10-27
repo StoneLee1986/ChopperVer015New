@@ -75,7 +75,12 @@ void RhythmChopLevel::handleInput(Side side) {
                          config::RHYTHM_AXE_Y);
 
     // 原版砍树：每次砍树，树枝整体下落一格 + 顶部生成新枝
+    // 先记住"即将压到玩家"的枝(index4)：砍后它落到玩家层(index5)
+    const Side incoming = m_branches[config::RHYTHM_BRANCH_COUNT - 2];
     advanceBranches();
+    // 若玩家砍的是反侧(躲开那根)，它已用过，立即清除，避免停在玩家层干扰(同 B 关卡的"躲开即消失")
+    if (incoming != Side::None && incoming != side)
+        m_branches[config::RHYTHM_BRANCH_COUNT - 1] = Side::None;
     // 判死：最底槽树枝在玩家所砍那一侧 → 被压死（先下落再判，原版顺序）
     checkCollision();
     if (m_dead) return;   // 已死：不再播音效/圆木/判定

@@ -77,6 +77,8 @@ private:
     SoundBuffer m_failBuffer;      // 失败音效采样数据（程序合成，柔和下行提示音）
     Sound       m_fail;            // 失败音效播放器（替代全局难听的 death.wav，仅本关用）
     int         m_currentBeat = 0; // 已触发的拍数
+    float       m_beatClock  = 0.0f; // 独立节拍时钟（由 dt 累计驱动，不依赖鼓声 getPlayingOffset，保证走满/通关可靠）
+    bool        m_ended = false;    // 结算互斥锁：压死/时间到/通关三种结局只执行最先触发的那一种
     bool        m_cleared = false; // 鼓声播完＝通关
     bool        m_dead    = false; // 被压死
 
@@ -89,6 +91,7 @@ private:
     bool  m_letterActive = false;      // 本拍是否显示字母（NONE 拍不显示）
     Side  m_letterSide   = Side::Left; // 本拍"应砍方向"（= 新枝反侧）：新枝左→Right、新枝右→Left
     float m_letterT      = 0.0f;       // 本拍内进度 0~1（驱动淡入/脉冲/淡出）
+    int   m_countdown    = 0;          // 开局倒计时拍数（树枝离玩家还远时，在AB位置显示 3,2,1）
     Text  m_hintFixed;                 // 固定提示行（双语）
     Text  m_letterText;                // 大号 A / B 字母
     Text  m_judgeText, m_comboText;    // 判定文字 / 连击文字

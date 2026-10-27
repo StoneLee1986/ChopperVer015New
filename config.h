@@ -101,10 +101,11 @@ namespace config {
     constexpr float  RHYTHM_BPM             = 60.0f;   // 节拍速度（拍/分钟）＝ 每秒一拍，便于调试
     constexpr int    RHYTHM_DRUM_BEATS      = 32;      // 合成鼓声总拍数（播完＝通关；32 拍≈32 秒）
     constexpr int    RHYTHM_BRANCH_COUNT    = 6;       // 树枝槽位数（从顶部走 6 格到玩家层，对齐原版砍树）
+    constexpr int    RHYTHM_START_COUNTDOWN = 4;       // 关卡B开局倒计时起始数：第一根枝到AB(index4)需5拍，倒计时4,3,2,1,0使0落在第4拍、第5拍无缝接AB
     constexpr float  RHYTHM_BRANCH_SPACING  = 150.0f;  // 相邻槽位垂直间距（6 格：0…750，最底=玩家层）
     // 关卡B专用：树枝整体 Y 偏移，使压死层(最底槽)视觉贴近并压住小人头顶(720)，产生压迫感。
-    // 关卡A(砍树驱动)未用此偏移，保持原版坐标。
-    constexpr float  RHYTHM_BRANCH_Y_OFFSET = -75.0f;
+    // 关卡A(砍树驱动)未用此偏移，保持原版坐标。当前 +115 上回 50px → +65（用户看效果）。
+    constexpr float  RHYTHM_BRANCH_Y_OFFSET = 65.0f;
     // 树枝生成概率接口（默认 左45/右45/无10，可随难度改写 m_pLeft/Right/None）
     constexpr float  RHYTHM_P_LEFT          = 0.45f;
     constexpr float  RHYTHM_P_RIGHT         = 0.45f;
@@ -152,7 +153,7 @@ namespace config {
     // ---- 最高分 ----
     constexpr int    HIGHSCORE_MAX = 20;      // 榜单最多 20 名
     constexpr int    NAME_MAX_LEN  = 10;      // 名字最长 10 个字母
-    constexpr float  GAME_OVER_DELAY = 0.5f;  // 游戏结束画面停留秒数，给玩家反应时间
+    constexpr float  GAME_OVER_DELAY = 1.0f;  // 游戏结束画面停留秒数，给玩家反应时间（0.5→1.0，跳高分榜慢 0.5s）
     constexpr const char* ASSET_HIGHSCORE = "highscores.txt"; // 存档文件
 
     // ---- 界面语言（设置界面可切换，持久化到 settings.txt；所有界面文字经 tr() 双语） ----

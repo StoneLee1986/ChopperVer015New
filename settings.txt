@@ -1,4 +1,4 @@
-MODE fullscreen
+MODE borderless
 RESOLUTION AUTO
 VSYNC 1
 FRAMERATE AUTO

@@ -58,10 +58,12 @@ void BeatDriveLevel::onStart() {
     m_playerSide   = Side::Left;                 // 小人回左边
     m_letterActive = false;
     m_letterT      = 0.0f;
+    m_countdown    = config::RHYTHM_START_COUNTDOWN;   // 开局倒计时开始
     m_score = 0; m_combo = 0; m_maxCombo = 0;
     m_timeRemaining = config::START_TIME;
     m_currentBeat = 0;
-    m_cleared = false; m_dead = false;
+    m_beatClock   = 0.0f;   // 独立节拍时钟归零（与鼓声同步起跑）
+    m_cleared = false; m_dead = false; m_ended = false;   // 结算锁复位
     m_logActive = false;   // 圆木复位（隐藏）
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头开局隐藏（砍击时才出现）
@@ -71,6 +73,7 @@ void BeatDriveLevel::onStart() {
 
 // 玩家按键：更新站位 + 以鼓声时刻为基准判定（Perfect/Good/Miss）
 void BeatDriveLevel::handleInput(Side side) {
+    if (m_ended) return;   // 已结算：不再响应按键（防结算后按键重新激活圆木/斧头，造成"原木还在"）
     m_playerSide = side;   // 小人移动到该侧（站位决定撞死判定）
     m_player.onSide(side); // 小人精灵切到对应一侧（本关自控站位）
     // 斧头始终跟随玩家所在侧（原版：砍就换侧；即使时机失误也瞬移，不留在原处）
@@ -83,10 +86,9 @@ void BeatDriveLevel::handleInput(Side side) {
     if (incoming != Side::None && incoming != side)
         m_branches[pending] = Side::None;   // 躲开 → 该树枝立即清除（红框随之消失）
 
-    const float now  = m_drum.getPlayingOffset().asSeconds();
     const float beat = 60.0f / config::RHYTHM_BPM;
-    const float nearest = std::round(now / beat) * beat;   // 最近的鼓声拍
-    const float diff    = std::fabs(now - nearest);
+    const float nearest = std::round(m_beatClock / beat) * beat;   // 以独立节拍时钟判拍（不依赖鼓声 offset）
+    const float diff    = std::fabs(m_beatClock - nearest);
     if (diff <= config::NOTE_GOOD_WINDOW) {                 // 在判定窗口内按＝命中
         const bool perfect = diff <= config::NOTE_PERFECT_WINDOW;
         ++m_combo;
@@ -110,26 +112,27 @@ void BeatDriveLevel::handleInput(Side side) {
 
 // 每帧推进：节拍 tick + 树枝下落 + 字母动画 + 时间条 + 碰撞/结束判定
 void BeatDriveLevel::update(float dt) {
-    if (m_dead || m_cleared) return;   // 已结束不再推进
+    if (m_ended) return;   // 已结算（压死/时间到/通关任一触发）不再推进
 
     const float beat = 60.0f / config::RHYTHM_BPM;
-    const float now  = m_drum.getPlayingOffset().asSeconds();
 
-    // 鼓声播完＝通关（currentBeat 已走满且 Sound 停）
-    if (m_currentBeat >= config::RHYTHM_DRUM_BEATS &&
-        m_drum.getStatus() == Sound::Stopped) {
-        m_cleared = true;
-        doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
-        return;
-    }
+    // 独立节拍时钟：由 dt 累计驱动，不依赖鼓声 getPlayingOffset（该值在播放后段不可靠，会导致树枝停走/不通关）
+    m_beatClock += dt;
 
-    // 跨拍检测：每过一拍触发一次"树枝下落 + 新枝生成 + 字母"（与鼓声同步）
+    // 跨拍检测：每过一拍触发一次"树枝下落 + 新枝生成 + 字母"（与鼓声节奏同步）
     while (m_currentBeat < config::RHYTHM_DRUM_BEATS &&
-           now >= (m_currentBeat + 1) * beat) {
+           m_beatClock >= (m_currentBeat + 1) * beat) {
         ++m_currentBeat;
         advanceBranches();
         checkCollision();      // 撞死会置 m_dead 并结算
         if (m_dead) return;
+    }
+
+    // 32 拍走完＝通关（currentBeat 由独立时钟推进，必定走满）
+    if (m_currentBeat >= config::RHYTHM_DRUM_BEATS) {
+        m_cleared = true;
+        doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
+        return;
     }
 
     // 字母动画推进（一拍内：淡入 → 脉冲回弹 → 淡出）
@@ -168,6 +171,7 @@ void BeatDriveLevel::update(float dt) {
 
 // 一拍：全部槽位下移一格 + 顶部按概率生成新枝 + 决定本拍字母
 void BeatDriveLevel::advanceBranches() {
+    if (m_countdown >= 0) --m_countdown;   // 开局倒计时：每拍递减 4→3→2→1→0→-1（到 -1 结束，接 AB）
     for (int i = config::RHYTHM_BRANCH_COUNT - 1; i > 0; --i)
         m_branches[i] = m_branches[i - 1];   // 下移一格
 
@@ -197,22 +201,27 @@ void BeatDriveLevel::checkCollision() {
     }
 }
 
-// 结束本局（死亡/时间到/通关）：停帧 + 提示 + 失败音效(可选) + 上榜结算
+// 结束本局（死亡/时间到/通关）：停帧 + 提示(带得分) + 失败音效(可选) + 清理残留 + 上榜结算
 void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
+    if (m_ended) return;              // 结算互斥：三种结局只执行最先触发的那一种
+    m_ended = true;
     m_game.m_paused = true;
-    m_game.setMessage(msg);
+    // 结束画面消息带本局得分（通关/压死/时间到都显示，结算更明确）
+    m_game.setMessage(msg + sf::String(" ") +
+                      sf::String(std::to_string(m_score)) + sf::String(tr("分", "pts")));
+    // 任何结束状态（压死/时间到/通关）都清理残留的斧头与圆木，避免停在画面干扰
+    m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
+    m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
+    m_logActive = false;
     if (playFailSound) {
         m_fail.play();
-        // 失败（压死/时间到）统一让斧头/圆木消失，避免残留画面
-        m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
-        m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
-        m_logActive = false;
+        // 失败（压死/时间到）：小人移出屏幕、墓碑留在该侧（通关保留小人画面）
+        m_player.die(m_playerSide);
     }
     m_drum.stop();
-    if (m_game.m_scoreboard.qualifiesForHighscore(m_score)) {
-        m_game.m_enterNamePending = true;
-        m_game.m_gameOverClock.restart();
-    }
+    // 所有结局（压死/时间到/通关）统一走结算：进入高分榜（是否上榜由 Game 主循环裁定）
+    m_game.m_enterNamePending = true;
+    m_game.m_gameOverClock.restart();
 }
 
 // 画本关全部场景（背景/云/蜜蜂 → 树 → 树枝 → 小人/墓碑 → 圆木 → 斧头）
@@ -266,8 +275,15 @@ void BeatDriveLevel::renderUI(sf::RenderWindow& w) {
     centerText(m_hintFixed, config::HINT_BOX_X + config::HINT_BOX_W / 2.0f, config::HINT_BOX_Y + 45.0f);
     w.draw(m_hintFixed);
 
+    // 开局倒计时提示：显示 4,3,2,1,0，随鼓点每拍递减；0 显示后直接接 AB（countdown>=0 时覆盖，-1 后进 AB）
+    if (m_countdown >= 0) {
+        m_letterText.setString(std::to_string(m_countdown));
+        m_letterText.setFillColor(Color::Yellow);
+        centerText(m_letterText, config::HINT_BOX_X + config::HINT_BOX_W / 2.0f, config::HINT_BOX_Y + 125.0f);
+        w.draw(m_letterText);
+    }
     // A/B 字母：鼓响瞬间放大回弹 + 淡入淡出（perfect 时机提示）
-    if (m_letterActive) {
+    else if (m_letterActive) {
         m_letterText.setString(m_letterSide == Side::Right ? "B" : "A");
         float scale = 1.0f;
         if (m_letterT < 0.15f)   // 0~0.15s：从最大快速回落到 1.0（鼓响瞬间脉冲）

@@ -83,14 +83,20 @@ Game::Game()
 //  主循环：一直跑到关窗
 // ============================================================================
 void Game::run() {
+    // 首帧先清黑并上屏：消除窗口创建后、主循环首帧渲染前 Windows 显示的默认白色背景（白屏闪现）
+    m_disp.window().clear(sf::Color::Black);
+    m_disp.window().display();
     while (m_disp.window().isOpen()) {
         processEvents();
         // 游戏结束画面停留片刻后，再进入名字输入（给玩家一点反应时间）
         if (m_enterNamePending &&
             m_gameOverClock.getElapsedTime().asSeconds() >= config::GAME_OVER_DELAY) {
             m_enterNamePending = false;
-            // 携带本局分数上榜（分数在关卡内自持）
-            m_nameUI.begin(m_level->score());
+            // 统一结算：上榜→先输入名字；不上榜→直接跳到高分榜（所有结局一致）
+            if (m_scoreboard.qualifiesForHighscore(m_level->score()))
+                m_nameUI.begin(m_level->score());   // 携带本局分数上榜
+            else
+                m_scoreboard.open();                // 不上榜也统一跳高分榜
         }
         if (!m_paused && !m_escPaused && !m_inMenu && !m_inPauseMenu && !m_confirmExit
             && !m_scoreboard.isOpen() && !m_nameUI.isActive() && !m_settingsMenu.isOpen()) {  // 不在任何菜单/输入/确认、没暂停才更新
@@ -132,10 +138,11 @@ void Game::processEvents() {
                              Keyboard::isKeyPressed(Keyboard::Return),
                              Keyboard::isKeyPressed(Keyboard::BackSpace),
                              Keyboard::isKeyPressed(Keyboard::Escape));
-        if (m_nameUI.hasCommitted()) {   // 已提交名字并写入榜单 → 退出游戏画面状态
+        if (m_nameUI.hasCommitted()) {   // 已提交名字并写入榜单 → 统一跳到高分榜
             m_nameUI.clearCommitted();
             m_inMenu = false;
             m_paused = true;
+            m_scoreboard.open();         // 提交上榜后显示含本局的高分榜
         }
         return;   // 名字输入阶段不再处理其他输入
     }
@@ -387,6 +394,7 @@ void Game::enterStage(config::GameMode mode) {
         case config::GameMode::ChopRhythm: m_level = &m_levelRhythm; m_levelRhythm.onStart(); break;
         case config::GameMode::BeatDrive:  m_level = &m_levelBeat;   m_levelBeat.onStart();   break;
     }
+    m_level->stop();   // 准备界面(按 Enter 开始)不播放鼓声；真正开局时 startNewGame 的 onStart 才播放
     setMessage(tr("按回车开始", "Press Enter to Start"));
 }
 
