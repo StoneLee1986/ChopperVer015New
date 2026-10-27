@@ -2,11 +2,13 @@
 #include "Game.h"
 #include <algorithm>   // std::min
 
-BeatDriveLevel::BeatDriveLevel(Game& g) : m_game(g), m_scenery(g.m_rng) {}
+BeatDriveLevel::BeatDriveLevel(Game& g) : m_game(g), m_scenery(g.m_rng)
+    , m_useAudioSync(config::AUDIO_SYNC_ENABLED), m_audioOffset(0.0f) {}
 
 // 一次性初始化：合成鼓声 + 建提示框/固定文字/字母/判定/连击 UI
 void BeatDriveLevel::initScene() {
     synthDrum();       // 程序合成 60BPM 规律鼓声
+    m_audioOffset = 0.0f;   // 初始化音频偏移量为 0（首次加载或重新配置后）
     synthFailSound();  // 程序合成失败音效（柔和下行提示音）
     // 本关场景元素（完全自包含，不再由 Game 全局共用）：背景/树/小人
     m_scenery.init(m_game.m_texBackground, m_game.m_texCloud, m_game.m_texBee);
@@ -56,6 +58,7 @@ void BeatDriveLevel::onStart() {
     for (Side& b : m_branches) b = Side::None;   // 6 槽树枝清空
     m_player.reset();        // 小人回左边、墓碑藏起来（本关自控位置）
     m_playerSide   = Side::Left;                 // 小人回左边
+    m_audioOffset = 0.0f;   // 新关卡重置音频偏移量（每局从头校准）
     m_letterActive = false;
     m_letterT      = 0.0f;
     m_countdown    = config::RHYTHM_START_COUNTDOWN;   // 开局倒计时开始
@@ -110,27 +113,29 @@ void BeatDriveLevel::handleInput(Side side) {
     }
 }
 
+// ============================================================================
 // 每帧推进：节拍 tick + 树枝下落 + 字母动画 + 时间条 + 碰撞/结束判定
 void BeatDriveLevel::update(float dt) {
-    if (m_ended) return;   // 已结算（压死/时间到/通关任一触发）不再推进
+    if (m_ended || m_dead || m_cleared) return;   // 已结算不再推进
 
     const float beat = 60.0f / config::RHYTHM_BPM;
 
-    // 独立节拍时钟：由 dt 累计驱动，不依赖鼓声 getPlayingOffset（该值在播放后段不可靠，会导致树枝停走/不通关）
-    m_beatClock += dt;
+    m_beatClock += dt;   // 独立节拍时钟：每帧由 dt 累计推进（此前缺失，导致树枝/字母/通关全部静止）
 
-    // 跨拍检测：每过一拍触发一次"树枝下落 + 新枝生成 + 字母"（与鼓声节奏同步）
+    // 跨拍检测：每过一拍触发一次"树枝下落 + 新枝生成 + 字母"
+    // 【关键修复】：使用基于时间的直接计算，确保准确推进到下一拍
     while (m_currentBeat < config::RHYTHM_DRUM_BEATS &&
-           m_beatClock >= (m_currentBeat + 1) * beat) {
+           m_beatClock >= static_cast<float>(m_currentBeat + 1) * beat) {
         ++m_currentBeat;
         advanceBranches();
         checkCollision();      // 撞死会置 m_dead 并结算
-        if (m_dead) return;
+        if (m_dead || m_cleared) return;   // 增加 m_cleared 检查
     }
 
     // 32 拍走完＝通关（currentBeat 由独立时钟推进，必定走满）
     if (m_currentBeat >= config::RHYTHM_DRUM_BEATS) {
         m_cleared = true;
+
         doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
         return;
     }

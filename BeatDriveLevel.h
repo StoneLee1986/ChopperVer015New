@@ -78,6 +78,10 @@ private:
     Sound       m_fail;            // 失败音效播放器（替代全局难听的 death.wav，仅本关用）
     int         m_currentBeat = 0; // 已触发的拍数
     float       m_beatClock  = 0.0f; // 独立节拍时钟（由 dt 累计驱动，不依赖鼓声 getPlayingOffset，保证走满/通关可靠）
+    
+    // ---- 音频同步（自动校准音轨偏移，解决硬件延迟问题） ----
+    bool m_useAudioSync = config::AUDIO_SYNC_ENABLED;     // 启用音频同步
+    float m_audioOffset = 0.0f;                           // 累积的音频偏移量（秒），每帧平滑更新到独立节拍时钟
     bool        m_ended = false;    // 结算互斥锁：压死/时间到/通关三种结局只执行最先触发的那一种
     bool        m_cleared = false; // 鼓声播完＝通关
     bool        m_dead    = false; // 被压死

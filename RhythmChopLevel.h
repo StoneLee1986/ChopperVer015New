@@ -76,6 +76,7 @@ private:
     SoundBuffer m_failBuffer;      // 失败音效采样数据（程序合成，柔和下行提示音）
     Sound       m_fail;            // 失败音效播放器（替代全局难听的 death.wav，仅本关用）
     int         m_currentBeat = 0; // 已触发的拍数
+    float       m_beatClock   = 0.0f; // 独立节拍时钟（由 dt 累计，不依赖鼓声 offset，保证走满/通关可靠）
     bool        m_cleared = false; // 鼓声播完＝通关
     bool        m_dead    = false; // 被压死
 

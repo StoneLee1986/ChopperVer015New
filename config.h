@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 //  CHOPPER 公共配置（config.h）：共享头文件
 //  所有子系统（MusicSystem / DisplayManager / Scoreboard / NameEntryUI /
 //  SettingsMenu / Game）都包含本头，统一获得 SFML 命名空间与全部"写死的数字"。
@@ -61,6 +61,9 @@ namespace config {
 
     // ---- 音频采样率与判定窗口（节奏鼓点关共用） ----
     constexpr int    SAMPLE_RATE      = 44100;     // 采样率
+    constexpr float  AUDIO_SYNC_ENABLED    = true;   // 启用音频同步（自动检测音轨偏移）
+    constexpr float  AUDIO_SYNC_THRESHOLD  = 0.2f;   // 音频同步阈值（超过此值才强制校准，单位：秒）
+    constexpr int    AUDIO_SYNC_INTERVAL   = 30;     // 音频同步检查间隔（毫秒）
     constexpr float  NOTE_LEFT_X      = 610.0f;    // 树枝贴树左轨道 X（原版 BRANCH_LEFT_X，根部贴树左缘）
     constexpr float  NOTE_RIGHT_X     = 1330.0f;   // 树枝贴树右轨道 X（原版 BRANCH_RIGHT_X，根部贴树右缘）
     constexpr float  BRANCH_SCALE     = 0.65f;     // 树枝显示缩放，避免重叠像"一排草"

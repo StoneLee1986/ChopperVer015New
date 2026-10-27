@@ -57,6 +57,7 @@ void RhythmChopLevel::onStart() {
     m_score = 0; m_combo = 0; m_maxCombo = 0;
     m_timeRemaining = config::START_TIME;
     m_currentBeat = 0;
+    m_beatClock   = 0.0f;   // 独立节拍时钟归零（与鼓声同步起跑）
     m_cleared = false; m_dead = false;
     m_logActive = false;   // 圆木复位（隐藏）
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
@@ -93,7 +94,7 @@ void RhythmChopLevel::handleInput(Side side) {
     m_logActive = true;
 
     // 节拍判定（计分后做；现只驱动 X 放大 + 时间条/得分/连击）
-    const float now  = m_drum.getPlayingOffset().asSeconds();
+    const float now  = m_beatClock;   // 以独立节拍时钟判拍（不依赖鼓声 offset，其后段失效）
     const float beat = 60.0f / config::RHYTHM_BPM;
     const float nearest = std::round(now / beat) * beat;   // 最近的鼓声拍
     const float diff    = std::fabs(now - nearest);
@@ -121,21 +122,20 @@ void RhythmChopLevel::update(float dt) {
     if (m_dead || m_cleared) return;   // 已结束不再推进
 
     const float beat = 60.0f / config::RHYTHM_BPM;
-    const float now  = m_drum.getPlayingOffset().asSeconds();
-
-    // 鼓声播完＝通关（currentBeat 已走满且 Sound 停）
-    if (m_currentBeat >= config::RHYTHM_DRUM_BEATS &&
-        m_drum.getStatus() == Sound::Stopped) {
-        m_cleared = true;
-        doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
-        return;
-    }
+    m_beatClock += dt;   // 独立节拍时钟：由 dt 累计驱动，不依赖鼓声 getPlayingOffset（其播放后段会失效）
 
     // 跨拍检测：每过一拍（鼓声响起）只推进拍数用于通关计数 + X 放大缩小一次（鼓声驱动的节拍引导）
     while (m_currentBeat < config::RHYTHM_DRUM_BEATS &&
-           now >= (m_currentBeat + 1) * beat) {
+           m_beatClock >= static_cast<float>(m_currentBeat + 1) * beat) {
         ++m_currentBeat;
         m_xPulse = 1.0f;   // 鼓声每响一次，X 放大缩小一次（提醒跟拍）
+    }
+
+    // 32 拍走满＝通关（currentBeat 由独立时钟推进，必定走满，不再依赖 Sound 播放状态/offset）
+    if (m_currentBeat >= config::RHYTHM_DRUM_BEATS) {
+        m_cleared = true;
+        doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
+        return;
     }
 
     // X 脉冲衰减（perfect 触发后 0.15s 内回落到 1.0，驱动放大缩小）
