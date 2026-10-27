@@ -51,11 +51,18 @@ void BeatDriveLevel::initScene() {
     m_comboText.setCharacterSize(50);
     m_comboText.setFillColor(Color::White);
     centerText(m_comboText, config::SCREEN_CENTER_X, 400.0f);
+
+    // 初始化树枝数组（所有槽位初始为无枝，缩放 1.0）
+    for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {
+        m_branches[i] = { Side::None, 1.0f };
+    }
 }
 
 // 每局开始：复位全部状态 + 从头播放鼓声
 void BeatDriveLevel::onStart() {
-    for (Side& b : m_branches) b = Side::None;   // 6 槽树枝清空
+    for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {
+        m_branches[i] = { Side::None, 1.0f };   // 重置为无枝，缩放 1.0
+    }
     m_player.reset();        // 小人回左边、墓碑藏起来（本关自控位置）
     m_playerSide   = Side::Left;                 // 小人回左边
     m_audioOffset = 0.0f;   // 新关卡重置音频偏移量（每局从头校准）
@@ -85,9 +92,9 @@ void BeatDriveLevel::handleInput(Side side) {
 
     // 玩家按对(移到反侧)躲开即将压到的那根树枝(index4)：它已用过，立即消失，避免停在玩家层干扰
     const int  pending  = config::RHYTHM_BRANCH_COUNT - 2;
-    const Side incoming = m_branches[pending];
+    const Side incoming = m_branches[pending].side;
     if (incoming != Side::None && incoming != side)
-        m_branches[pending] = Side::None;   // 躲开 → 该树枝立即清除（红框随之消失）
+        m_branches[pending] = { Side::None, 1.0f };   // 躲开 → 该树枝立即清除（红框随之消失）
 
     const float beat = 60.0f / config::RHYTHM_BPM;
     const float nearest = std::round(m_beatClock / beat) * beat;   // 以独立节拍时钟判拍（不依赖鼓声 offset）
@@ -177,28 +184,31 @@ void BeatDriveLevel::update(float dt) {
 // 一拍：全部槽位下移一格 + 顶部按概率生成新枝 + 决定本拍字母
 void BeatDriveLevel::advanceBranches() {
     if (m_countdown >= 0) --m_countdown;   // 开局倒计时：每拍递减 4→3→2→1→0→-1（到 -1 结束，接 AB）
-    for (int i = config::RHYTHM_BRANCH_COUNT - 1; i > 0; --i)
-        m_branches[i] = m_branches[i - 1];   // 下移一格
+    for (int i = config::RHYTHM_BRANCH_COUNT - 1; i > 0; --i) {
+        m_branches[i] = m_branches[i - 1];   // 下移一格（携带侧别与缩放）
+        if (m_branches[i].side != Side::None)
+            m_branches[i].scale *= config::RHYTHM_BRANCH_GROW_PER_SLOT;   // 每靠近玩家一槽 +5%
+    }
 
-    // 顶部按概率接口生成新枝（关卡 B 默认 左50/右50/无0）
+    // 顶部按概率接口生成新枝（关卡 B 默认 左50/右50/无0；缩放从 1.0 起步，随下落逐格放大）
     const int r  = static_cast<int>(m_game.m_rng() % 1000);
     const int l  = static_cast<int>(m_pLeft  * 1000.0f);
     const int rp = static_cast<int>(m_pRight * 1000.0f);
-    if      (r < l)              m_branches[0] = Side::Left;
-    else if (r < l + rp)         m_branches[0] = Side::Right;
-    else                         m_branches[0] = Side::None;
+    if      (r < l)              m_branches[0] = { Side::Left,  1.0f };
+    else if (r < l + rp)         m_branches[0] = { Side::Right, 1.0f };
+    else                         m_branches[0] = { Side::None,  1.0f };
 
     // 字母提示 = 即将压到玩家的树枝（index4，下一拍进入玩家层 index5）的反侧：
     // 该枝在左→提示按右(B)、在右→提示按左(A)、该槽无枝→不显示（进度清零）
     const int pending = config::RHYTHM_BRANCH_COUNT - 2;   // 即将进入玩家层的槽位（6槽→index4）
-    if      (m_branches[pending] == Side::Left)  { m_letterActive = true; m_letterSide = Side::Right; m_letterT = 0.0f; }
-    else if (m_branches[pending] == Side::Right) { m_letterActive = true; m_letterSide = Side::Left;  m_letterT = 0.0f; }
+    if      (m_branches[pending].side == Side::Left)  { m_letterActive = true; m_letterSide = Side::Right; m_letterT = 0.0f; }
+    else if (m_branches[pending].side == Side::Right) { m_letterActive = true; m_letterSide = Side::Left;  m_letterT = 0.0f; }
     else { m_letterActive = false; m_letterT = 0.0f; }   // 该槽无枝：绝无字母出现
 }
 
 // 碰撞：最底层(玩家层)树枝与玩家同侧 → 被压死（树枝撞到玩家，原版判定）
 void BeatDriveLevel::checkCollision() {
-    const Side bottom = m_branches[config::RHYTHM_BRANCH_COUNT - 1];
+    const Side bottom = m_branches[config::RHYTHM_BRANCH_COUNT - 1].side;
     if (bottom != Side::None && bottom == m_playerSide) {
         m_dead = true;
         m_player.die(m_playerSide);   // 压死视觉：小人移出屏幕、墓碑留在被压那一侧
@@ -237,23 +247,29 @@ void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
     // 下落中的树枝（长在树上，画在树前）
     const int pending = config::RHYTHM_BRANCH_COUNT - 2;   // 字母对应的树枝 = 即将压到玩家的槽位(index4)
     for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {
-        if (m_branches[i] == Side::None) continue;
+        if (m_branches[i].side == Side::None) continue;
         Sprite branch(m_game.m_texBranch);
         branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
-        // 原版树枝无缩放：440 宽、锚点中心，无缩放时端部正好贴住树身（左→830/右→1110）
+        // 越靠近玩家一槽，树枝放大 +5%（scale 在 advanceBranches 下移时累积）
+        const float scale = m_branches[i].scale;
+        branch.setScale(scale, scale);
         // 加 RHYTHM_BRANCH_Y_OFFSET：让压死层(最底槽)贴近小人头顶，消除"树枝远离玩家"的视觉空隙
         const float y = i * config::RHYTHM_BRANCH_SPACING + config::RHYTHM_BRANCH_Y_OFFSET;
-        if (m_branches[i] == Side::Left) { branch.setPosition(config::NOTE_LEFT_X, y); branch.setRotation(180.0f); }
-        else                              { branch.setPosition(config::NOTE_RIGHT_X, y); branch.setRotation(0.0f); }
+        if (m_branches[i].side == Side::Left) { branch.setPosition(config::NOTE_LEFT_X, y); branch.setRotation(180.0f); }
+        else                                   { branch.setPosition(config::NOTE_RIGHT_X, y); branch.setRotation(0.0f); }
         w.draw(branch);
 
         // 校对红框：框住字母对应的那根树枝(index4)，粗红框，明暗节奏与字母完全同步（同相位闪烁）
         if (i == pending && m_letterActive) {
             const sf::Vector2u tsz = m_game.m_texBranch.getSize();
             const float margin = 12.0f;
-            RectangleShape box(Vector2f(tsz.x + 2.0f * margin, tsz.y + 2.0f * margin));
-            box.setPosition(branch.getPosition().x - config::BRANCH_ORIGIN_X - margin,
-                            branch.getPosition().y - config::BRANCH_ORIGIN_Y - margin);
+            // 红框尺寸与树枝缩放同步放大（边距也随缩放等比例）
+            const float scaledMargin = margin * scale;
+            RectangleShape box(Vector2f(tsz.x * scale + 2.0f * scaledMargin,
+                                        tsz.y * scale + 2.0f * scaledMargin));
+            // 原点(中心)固定，缩放后红框半宽 = (BRANCH_ORIGIN + margin) × scale
+            box.setPosition(branch.getPosition().x - (config::BRANCH_ORIGIN_X + margin) * scale,
+                            branch.getPosition().y - (config::BRANCH_ORIGIN_Y + margin) * scale);
             box.setFillColor(Color::Transparent);
             box.setOutlineThickness(6.0f);   // 粗框，防不明显
             // 与字母相同的淡入/保持/淡出相位 → 与字母同频率闪烁

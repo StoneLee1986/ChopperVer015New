@@ -80,7 +80,7 @@ namespace config {
     constexpr float PLAYER_RIGHT_X  = 1200.0f;  // 小人站右边时的 X（原版，树枝外侧）
     constexpr float RIP_Y           = 860.0f;   // 墓碑的 Y 坐标
     constexpr float RIP_HIDE_X      = 675.0f;   // 墓碑隐藏时的 X（移出屏幕）
-    constexpr float RIP_HIDE_Y      = 2000.0f;  // 墓碑隐藏时的 Y（移出屏幕）
+    constexpr float RIP_HIDE_Y      = 2000.0f;  // 墓碑隐藏的 Y（移出屏幕）
     constexpr float RIP_SQUISH_LEFT_X  = 560.0f;  // 左侧被压死时墓碑的 X
     constexpr float RIP_SQUISH_RIGHT_X = 1180.0f;  // 右侧被压死时墓碑的 X
     constexpr float BEE_INIT_Y      = 800.0f;  // 蜜蜂初始 Y
@@ -92,24 +92,24 @@ namespace config {
     constexpr float  BRANCH_ORIGIN_X = 220.0f;   // 树枝贴图的旋转锚点 X
     constexpr float  BRANCH_ORIGIN_Y = 20.0f;    // 树枝贴图的旋转锚点 Y
 
-    // ---- 关卡1·节奏鼓点的砍树反馈（复现原版 timber.cpp：斧头瞬移换侧 + 单块圆木水平飞出） ----
+    // ---- 关卡 1·节奏鼓点的砍树反馈（复现原版 timber.cpp：斧头瞬移换侧 + 单块圆木水平飞出） ----
     constexpr float AXE_SCALE       = 1.6f;      // 斧头放大（152x28 偏小，放大才醒目）
-    constexpr float AXE_EMBED_ROT    = 30.0f;    // 嵌在树上时斧头角度(度,左)
+    constexpr float AXE_EMBED_ROT    = 30.0f;    // 嵌在树上时斧头角度 (度，左)
 
     // ---- 关卡/玩法模式（两个独立关卡并存：021 砍树驱动 / 020 鼓点驱动，各自完全自包含） ----
-    enum class GameMode { ChopRhythm, BeatDrive };  // ChopRhythm=021砍树驱动 / BeatDrive=020鼓点驱动
+    enum class GameMode { ChopRhythm, BeatDrive };  // ChopRhythm=021 砍树驱动 / BeatDrive=020 鼓点驱动
 
-    // ---- 关卡3·节奏鼓点：节拍器驱动的音游砍树（独立于 MusicSystem 的下落音符机制） ----
+    // ---- 关卡 3·节奏鼓点：节拍器驱动的音游砍树（独立于 MusicSystem 的下落音符机制） ----
     // 每拍鼓声 tick：树枝下落一格 + 字母提示 + 玩家在鼓声瞬间按对方向键
     constexpr float  RHYTHM_BPM             = 60.0f;   // 节拍速度（拍/分钟）＝ 每秒一拍，便于调试
     constexpr int    RHYTHM_DRUM_BEATS      = 32;      // 合成鼓声总拍数（播完＝通关；32 拍≈32 秒）
     constexpr int    RHYTHM_BRANCH_COUNT    = 6;       // 树枝槽位数（从顶部走 6 格到玩家层，对齐原版砍树）
-    constexpr int    RHYTHM_START_COUNTDOWN = 4;       // 关卡B开局倒计时起始数：第一根枝到AB(index4)需5拍，倒计时4,3,2,1,0使0落在第4拍、第5拍无缝接AB
+    constexpr int    RHYTHM_START_COUNTDOWN = 4;       // 关卡 B 开局倒计时起始数：第一根枝到 AB(index4) 需 5 拍，倒计时 4,3,2,1,0 使 0 落在第 4 拍、第 5 拍无缝接 AB
     constexpr float  RHYTHM_BRANCH_SPACING  = 150.0f;  // 相邻槽位垂直间距（6 格：0…750，最底=玩家层）
-    // 关卡B专用：树枝整体 Y 偏移，使压死层(最底槽)视觉贴近并压住小人头顶(720)，产生压迫感。
-    // 关卡A(砍树驱动)未用此偏移，保持原版坐标。当前 +115 上回 50px → +65（用户看效果）。
+    // 关卡 B 专用：树枝整体 Y 偏移，使压死层 (最底槽) 视觉贴近并压住小人头顶 (720)，产生压迫感。
+    // 关卡 A(砍树驱动) 未用此偏移，保持原版坐标。当前 +115 上回 50px → +65（用户看效果）。
     constexpr float  RHYTHM_BRANCH_Y_OFFSET = 65.0f;
-    // 树枝生成概率接口（默认 左45/右45/无10，可随难度改写 m_pLeft/Right/None）
+    // 树枝生成概率接口（默认 左 45/右 45/无 10，可随难度改写 m_pLeft/Right/None）
     constexpr float  RHYTHM_P_LEFT          = 0.45f;
     constexpr float  RHYTHM_P_RIGHT         = 0.45f;
     constexpr float  RHYTHM_P_NONE          = 0.10f;
@@ -121,7 +121,7 @@ namespace config {
     constexpr unsigned int HINT_FONT_SIZE   = 30;  // 固定提示行字号
     constexpr unsigned int HINT_LETTER_SIZE = 90;  // A/B 字母字号
     constexpr float  HINT_LETTER_PULSE = 0.35f;// 鼓响瞬间字母放大幅度（1.0 → 1+幅度 再回弹）
-    // 关卡3·原版砍树动作（复现 timber.cpp：斧头换侧瞬移 + 单块圆木向反侧飞出）
+    // 关卡 3·原版砍树动作（复现 timber.cpp：斧头换侧瞬移 + 单块圆木向反侧飞出）
     constexpr float  RHYTHM_AXE_LEFT_X  = 700.0f;   // 斧头在左侧位置 X（原版）
     constexpr float  RHYTHM_AXE_RIGHT_X = 1075.0f;  // 斧头在右侧位置 X（原版）
     constexpr float  RHYTHM_AXE_Y       = 830.0f;   // 斧头 Y（原版，贴近树底）
@@ -129,8 +129,9 @@ namespace config {
     constexpr float  RHYTHM_LOG_VX      = 5000.0f;  // 圆木水平飞出速度（原版极速，飞出干脆）
     constexpr float  RHYTHM_LOG_VY      = -1500.0f; // 圆木垂直初速（原版向上，负号=屏幕上方）
     constexpr float  RHYTHM_LOG_SCALE   = 0.6f;     // 圆木显示缩放（0.35 太小放大到约 180x72，醒目但不过大）
+    constexpr float  RHYTHM_BRANCH_GROW_PER_SLOT = 1.05f; // 树枝每靠近玩家一槽放大倍数(+5%)，越近越大营造压迫感
 
-    // ---- 树（静态完整树，关卡1·节奏鼓点自持；本关不倒/不变细） ----
+    // ---- 树（静态完整树，关卡 1·节奏鼓点自持；本关不倒/不变细） ----
     constexpr float TREE_ANCHOR_X   = TREE_X + 150.0f;  // 树底部锚点 X = 960（贴图中心）
     constexpr float TREE_GROUND_Y   = 900.0f;           // 树底（贴图高 900，底部固定在地面）
 
@@ -170,7 +171,8 @@ namespace config {
     }
 }
 
-// 把 tr 引入全局命名空间：调用点可直接写 tr(中,英)，无需 config:: 前缀
+// 把 tr 引入全局命名空间：调用点可直接写 tr(中，英)，无需 config:: 前缀
 // （其余 config 成员都用 config:: 显式限定，唯独 tr 设计为裸名调用）
 using config::tr;
+
 #endif

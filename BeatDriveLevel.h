@@ -22,6 +22,12 @@
 
 class Game;   // 前置声明：关卡类经 friend 访问 Game 私有成员
 
+// 树枝信息结构体（带缩放倍数）
+struct BranchInfo {
+    Side side;          // Left / Right / None
+    float scale;        // 当前缩放倍数 (初始 1.0, 每格 +5%)
+};
+
 class BeatDriveLevel : public ILevel {
 public:
     explicit BeatDriveLevel(Game& g);
@@ -87,7 +93,7 @@ private:
     bool        m_dead    = false; // 被压死
 
     // ---- 树枝（槽位：0 顶 … 底=玩家层） ----
-    Side m_branches[config::RHYTHM_BRANCH_COUNT] = {};
+    BranchInfo m_branches[config::RHYTHM_BRANCH_COUNT];
     // ---- 玩家站位（按方向键更新） ----
     Side m_playerSide = Side::Left;
 
