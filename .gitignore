@@ -380,3 +380,7 @@ tools/*.obj
 tree.txt
 ChopperV.*/
 
+
+# 运行时存档（本机数据，不进版本库）
+highscores.txt
+
