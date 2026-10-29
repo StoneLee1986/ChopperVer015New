@@ -384,3 +384,7 @@ ChopperV.*/
 # 运行时存档（本机数据，不进版本库）
 highscores.txt
 
+
+# 帧耗时诊断日志
+perf.log
+

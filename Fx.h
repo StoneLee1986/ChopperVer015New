@@ -73,6 +73,7 @@ private:
     // 复用绘制对象，避免每帧构造
     sf::RectangleShape m_quad;
     sf::CircleShape    m_circle;
+    sf::VertexArray    m_batch{ sf::Triangles };   // 粒子合批：一帧一次 draw call
 
     // 震动
     sf::Vector2f m_shakeOffset{ 0.0f, 0.0f };

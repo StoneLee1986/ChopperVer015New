@@ -2,7 +2,20 @@
 #include "Game.h"
 #include "bgm_songs.h"
 #include <SFML/Audio.hpp>
+#include <cstdio>
 #include <cstdlib>
+
+namespace {
+// 帧耗时日志的绝对路径：写到用户主目录，不依赖进程工作目录（VS 启动时工作目录不确定）
+std::string perfLogPath() {
+    char*  p = nullptr;
+    size_t n = 0;
+    _dupenv_s(&p, &n, "USERPROFILE");
+    std::string s = std::string(p ? p : ".") + "\\chopper_perf.log";
+    if (p) free(p);
+    return s;
+}
+} // namespace
 
 Game::Game()
     : m_levelRhythm(*this),        // 关卡 A · 021 砍树驱动
@@ -90,6 +103,10 @@ void Game::run() {
     // 首帧先清黑并上屏：消除窗口创建后、主循环首帧渲染前 Windows 显示的默认白色背景（白屏闪现）
     m_disp.window().clear(sf::Color::Black);
     m_disp.window().display();
+    if (config::PERF_LOG) {   // 每次启动写一行标记，便于确认"这一局确实跑的是新版本"
+        std::ofstream f(perfLogPath(), std::ios::app);
+        if (f) f << "--- run start (build " << __DATE__ << " " << __TIME__ << ") ---\n";
+    }
     while (m_disp.window().isOpen()) {
         processEvents();
         // 游戏结束画面停留片刻后，再进入名字输入（给玩家一点反应时间）
@@ -110,13 +127,7 @@ void Game::run() {
             ++m_perfFrames;
             if (ms > m_perfMax) m_perfMax = ms;
             if (m_perfAccum >= 2000.0f) {
-                // 写到系统临时目录，避免放在 OneDrive 里反复触发同步（那本身就会造成卡顿）
-                char* tmp = nullptr;
-                size_t tmpLen = 0;
-                _dupenv_s(&tmp, &tmpLen, "TEMP");
-                const std::string path = std::string(tmp ? tmp : ".") + "/chopper_perf.log";
-                if (tmp) free(tmp);
-                std::ofstream f(path, std::ios::app);
+                std::ofstream f(perfLogPath(), std::ios::app);
                 if (f) f << "avg=" << (m_perfAccum / static_cast<float>(m_perfFrames))
                          << "ms max=" << m_perfMax
                          << "ms frames=" << m_perfFrames
@@ -526,6 +537,7 @@ void Game::applyLanguage() {
     centerText(m_confirmOptions[1], config::SCREEN_CENTER_X + 150.0f, 550.0f);
     // 分数前缀（分数在关卡内自持）
     m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(m_level->score()));
+    m_lastScoreShown = m_level ? m_level->score() : -1;   // 同步缓存，避免下一帧重复重排
 
     // 各子界面文字按当前语言刷新
     m_settingsMenu.applyLanguage();
@@ -588,7 +600,12 @@ void Game::update(const Time& dt) {
     // 时间条与分数由关卡数值驱动
     m_timeBar.setSize(Vector2f(m_level->timeBarWidthPerSecond() * m_level->timeRemaining(),
                                config::TIME_BAR_HEIGHT));
-    m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(m_level->score()));
+    // 分数没变就不重排文字：中文 Text 每次 setString 都要重建顶点数组，很吃帧
+    const int sc = m_level->score();
+    if (sc != m_lastScoreShown) {
+        m_lastScoreShown = sc;
+        m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(sc));
+    }
 }
 
 // （关卡1/2 与 MusicSystem 的逻辑已随重构删除，Game 只做框架 + 调度唯一关卡）
@@ -603,14 +620,23 @@ void Game::render() {
     m_disp.window().setView(m_disp.view());  // 所有绘制都在 1920x1080 逻辑坐标下，由视图自动适配到实际窗口
     // ---- 内置 FPS 统计（右上角，0.5s 刷新一次；不依赖外部工具，真实反映渲染帧率） ----
     if (m_disp.showFps()) {
+        const float frameSec = m_fpsClock.restart().asSeconds();
+        const float frameMs  = frameSec * 1000.0f;
+        m_fpsLastMs = frameMs;
+        if (frameMs > m_fpsMaxMs) m_fpsMaxMs = frameMs;
         ++m_fpsFrames;
-        m_fpsAccum += m_fpsClock.restart().asSeconds();
+        m_fpsAccum += frameSec;
         if (m_fpsAccum >= 0.5f) {
             const int fps = static_cast<int>(m_fpsFrames / m_fpsAccum + 0.5f);
-            m_fpsText.setString("FPS: " + std::to_string(fps));
+            // 同时显示本帧耗时与 0.5 秒内的最差帧：判卡顿只看 FPS 会漏掉尖峰
+            char buf[96];
+            std::snprintf(buf, sizeof(buf), "FPS %d   %.1fms   max %.1fms",
+                          fps, static_cast<double>(m_fpsLastMs), static_cast<double>(m_fpsMaxMs));
+            m_fpsText.setString(buf);
             alignRow(m_fpsText, config::SCREEN_WIDTH - 20.0f, 20.0f, 2); // 文本变长需重对齐，否则右缘溢出屏幕
             m_fpsFrames = 0;
             m_fpsAccum  = 0.0f;
+            m_fpsMaxMs  = 0.0f;
         }
     }
     if (m_nameUI.isActive()) {
@@ -711,6 +737,7 @@ void Game::loadAssets() {
     // 加载字体
     if (!m_font.loadFromFile(config::ASSET_FONT))
         std::cerr << "[Warning] 字体加载失败: " << config::ASSET_FONT << "\n";
+    prewarmFont();   // 提前把要用到的字烘焙好，避免游戏中首帧出现新字时掉帧
     // 加载命中打击音效（砍树反馈）
     if (!m_soundBuffer.loadFromFile(config::ASSET_CHOP_SOUND))
         std::cerr << "[Warning] 音效加载失败: " << config::ASSET_CHOP_SOUND << "\n";
@@ -733,6 +760,31 @@ void Game::loadAssets() {
     m_bgmPlayer.setLoop(true);
     m_bgmPlayer.setVolume(config::BGM_VOLUME);   // 背景层：只做铺垫
     m_sound.setVolume(config::SFX_VOLUME);       // 打击音效：必须能听见
+}
+
+// 预烘焙字形。
+// SFML 的字体是懒加载：某个字符第一次出现在屏幕上时才光栅化并上传纹理，
+// 这一下可能耗时好几毫秒——在 160Hz（每帧 6.25ms）下就足以漏掉一整帧。
+// 启动时把所有会用到的字符先取一遍，游戏中就不会再有这种尖峰。
+void Game::prewarmFont() {
+    const unsigned int sizes[] = { 30u, 50u, 60u, 75u, 80u, 90u, 100u, 150u };
+
+    // 可见 ASCII（菜单是英文、数字、标点）
+    for (unsigned int s : sizes)
+        for (char32_t c = 32; c < 127; ++c)
+            m_font.getGlyph(c, s, false);
+
+    // 界面上出现过的中文
+    const char32_t zh[] = {
+        U'完', U'美', U'好', U'失', U'误', U'通', U'关', U'得', U'分', U'秒',
+        U'时', U'间', U'到', U'你', U'被', U'压', U'死', U'了', U'按', U'回',
+        U'车', U'开', U'始', U'清', U'空', U'全', U'部', U'记', U'录', U'确',
+        U'定', U'退', U'出', U'游', U'戏', U'否', U'是', U'设', U'置', U'语',
+        U'言', U'音', U'量', U'关', U'卡', U'选', U'择', U'最', U'高'
+    };
+    for (unsigned int s : sizes)
+        for (char32_t c : zh)
+            m_font.getGlyph(c, s, false);
 }
 
 // ============================================================================

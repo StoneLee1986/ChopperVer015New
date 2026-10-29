@@ -51,6 +51,7 @@ private:
 
     // ---- 资源加载与场景初始化 ----
     bool loadTexture(Texture& out, const char* path, const char* name); // 加载单张纹理
+    void prewarmFont();     // 预烘焙字形：避免游戏中首次出现新字时卡一下
     void loadAssets();      // 一次性加载所有纹理、字体、音效
     void initScene();       // 把每个精灵摆好初始位置
 
@@ -75,6 +76,9 @@ private:
     Clock m_fpsClock;           // FPS 统计计时器
     int   m_fpsFrames = 0;      // 累计帧数
     float m_fpsAccum  = 0.0f;   // 累计时间
+    float m_fpsLastMs = 0.0f;   // 本帧耗时（毫秒）
+    float m_fpsMaxMs  = 0.0f;   // 本轮统计窗口内的最差帧（毫秒）
+    int   m_lastScoreShown = -1; // 已显示过的分数，避免每帧重排文字
 
     // ---- 纹理（图片数据，一份就行，多个精灵共用；元素精灵放关卡内） ----
     Texture m_texBackground, m_texTree, m_texBee, m_texCloud;

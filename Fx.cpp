@@ -92,19 +92,24 @@ void Fx::drawScene(sf::RenderTarget& rt) {
         rt.draw(m_circle);
     }
 
-    // 粒子
+    // 粒子：全部塞进一个 VertexArray，一次 draw call（原来是每颗粒子一次绘制）
+    m_batch.clear();
     for (auto& p : m_particles) {
         if (!p.active) continue;
         const float k = std::max(0.0f, p.life / p.maxLife);
         sf::Color c = p.color;
         c.a = static_cast<sf::Uint8>(255.0f * k);
-        const float s = p.size * (0.5f + 0.5f * k);   // 越接近消散越小
-        m_quad.setSize(sf::Vector2f(s, s));
-        m_quad.setOrigin(s * 0.5f, s * 0.5f);
-        m_quad.setPosition(p.pos);
-        m_quad.setFillColor(c);
-        rt.draw(m_quad);
+        const float h = p.size * (0.5f + 0.5f * k) * 0.5f;   // 半边长，越接近消散越小
+        const float x = p.pos.x, y = p.pos.y;
+
+        m_batch.append(sf::Vertex(sf::Vector2f(x - h, y - h), c));
+        m_batch.append(sf::Vertex(sf::Vector2f(x + h, y - h), c));
+        m_batch.append(sf::Vertex(sf::Vector2f(x + h, y + h), c));
+        m_batch.append(sf::Vertex(sf::Vector2f(x - h, y - h), c));
+        m_batch.append(sf::Vertex(sf::Vector2f(x + h, y + h), c));
+        m_batch.append(sf::Vertex(sf::Vector2f(x - h, y + h), c));
     }
+    if (m_batch.getVertexCount() > 0) rt.draw(m_batch);
 }
 
 // ---------------------------------------------------------------------------
