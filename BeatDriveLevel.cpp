@@ -187,7 +187,7 @@ void BeatDriveLevel::advanceBranches() {
     for (int i = config::RHYTHM_BRANCH_COUNT - 1; i > 0; --i) {
         m_branches[i] = m_branches[i - 1];   // 下移一格（携带侧别与缩放）
         if (m_branches[i].side != Side::None)
-            m_branches[i].scale *= config::RHYTHM_BRANCH_GROW_PER_SLOT;   // 每靠近玩家一槽 +5%
+            m_branches[i].scale *= config::RHYTHM_BRANCH_GROW_PER_SLOT;   // 每靠近玩家一槽 +2%
     }
 
     // 顶部按概率接口生成新枝（关卡 B 默认 左50/右50/无0；缩放从 1.0 起步，随下落逐格放大）
@@ -250,7 +250,7 @@ void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
         if (m_branches[i].side == Side::None) continue;
         Sprite branch(m_game.m_texBranch);
         branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
-        // 越靠近玩家一槽，树枝放大 +5%（scale 在 advanceBranches 下移时累积）
+        // 越靠近玩家一槽，树枝放大 +2%（scale 在 advanceBranches 下移时累积）
         const float scale = m_branches[i].scale;
         branch.setScale(scale, scale);
         // 加 RHYTHM_BRANCH_Y_OFFSET：让压死层(最底槽)贴近小人头顶，消除"树枝远离玩家"的视觉空隙

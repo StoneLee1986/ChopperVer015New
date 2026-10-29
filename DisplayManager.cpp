@@ -1,4 +1,4 @@
-﻿// CHOPPER - DisplayManager implementation
+// CHOPPER - DisplayManager implementation
 #include "DisplayManager.h"
 
 // ============================================================================
@@ -164,7 +164,7 @@ void DisplayManager::applyDisplay() {
         }
     }
     m_resolution = mode;
-    m_window.create(mode, "Timber!!!", style);   // 重建窗口（用新模式/尺寸）
+    m_window.create(mode, "CHOPPER - AI Dev", style);   // 重建窗口（用新模式/尺寸）；标题带 AI Dev 以区分原版
     // 创建后立即填黑并上屏：覆盖 Windows 在窗口创建后、首帧渲染前显示的默认白色背景（白屏闪现）
     m_window.clear(sf::Color::Black);
     m_window.display();
