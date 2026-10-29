@@ -75,8 +75,9 @@ namespace config {
     constexpr float  NOTE_PERFECT_WINDOW = 0.15f;  // 判定窗口：PERFECT ±0.15s（宽松）
     constexpr float  NOTE_GOOD_WINDOW    = 0.30f;  // 判定窗口：GOOD ±0.30s（宽松，之外 MISS）
     constexpr float  TIME_DECAY_PER_SEC  = 0.30f;  // 时间条每秒自然衰减（秒/秒）
-    constexpr float  HIT_TIME_BONUS      = 0.6f;   // 命中回血（秒）
-    constexpr float  MISS_TIME_PENALTY   = 0.8f;   // MISS 扣血（秒）
+    constexpr float  HIT_TIME_PERFECT    = 1.2f;   // 完美按拍：回血最多（秒）
+    constexpr float  HIT_TIME_GOOD       = 0.6f;   // 良好按拍：回血减半（秒）
+    constexpr float  MISS_TIME_PENALTY   = 1.2f;   // 不在拍上：倒扣时间（秒）
 
     // ---- 场景里各元素的固定坐标（对齐原版 Timber!!!：玩家站在树两侧外侧、树枝根部贴树） ----
     constexpr float TREE_X          = 810.0f;   // 树的贴图左上角 X

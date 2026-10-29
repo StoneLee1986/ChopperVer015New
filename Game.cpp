@@ -39,6 +39,7 @@ Game::Game()
         m_menuOptions[i].setFillColor(Color::White);
     }
     setupMenu(MenuKind::Main);   // 开局显示主菜单
+    switchBgm(BgmState::Menu);   // 主菜单 BGM：一进游戏就有音乐
 
     // ---- 退出二次确认界面 ----
     m_confirmTitle.setFont(m_font);
@@ -195,6 +196,7 @@ void Game::processEvents() {
                 m_enterHeld = true;
                 m_scoreboard.close();
                 m_inMenu = true;   // 回主菜单
+                switchBgm(BgmState::Menu);   // 回主菜单就切回菜单 BGM
             }
         } else {
             m_enterHeld = false;
@@ -322,6 +324,7 @@ void Game::processEvents() {
                         m_paused      = true;   // 主菜单阶段不推进游戏
                         m_inMenu      = true;
                         stopBgm();         // 停止当前关卡背景声
+                        switchBgm(BgmState::Menu);   // 回主菜单切回菜单 BGM
                         setupMenu(MenuKind::Main);   // 填回主菜单选项
                         break;
                     case 2:   // GAME SETTINGS：进入设置界面，返回时回暂停菜单

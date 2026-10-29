@@ -96,6 +96,9 @@ void BeatDriveLevel::handleInput(Side side) {
     if (incoming != Side::None && incoming != side)
         m_branches[pending] = { Side::None, 1.0f };   // 躲开 → 该树枝立即清除（红框随之消失）
 
+    // 倒计时阶段（m_countdown >= 0）：玩家还没真正开始，只响应站位移动，不判定也不计时
+    if (m_countdown >= 0) return;
+
     const float beat = 60.0f / config::RHYTHM_BPM;
     const float nearest = std::round(m_beatClock / beat) * beat;   // 以独立节拍时钟判拍（不依赖鼓声 offset）
     const float diff    = std::fabs(m_beatClock - nearest);
@@ -104,7 +107,8 @@ void BeatDriveLevel::handleInput(Side side) {
         ++m_combo;
         if (m_combo > m_maxCombo) m_maxCombo = m_combo;
         m_score += perfect ? 100 : 50;
-        m_timeRemaining = std::min(config::START_TIME, m_timeRemaining + config::HIT_TIME_BONUS);
+        m_timeRemaining = std::min(config::START_TIME, m_timeRemaining +
+                                   (perfect ? config::HIT_TIME_PERFECT : config::HIT_TIME_GOOD));
         setJudge(perfect ? "完美" : "好", perfect ? "PERFECT" : "GOOD",
                  perfect ? Color::Yellow : Color::Green);
         m_game.m_sound.play();   // 命中打击音效（chop.wav）
@@ -163,12 +167,14 @@ void BeatDriveLevel::update(float dt) {
     // 背景装饰推进：云 + 蜜蜂漂移（本关自持场景元素）
     m_scenery.update(sf::seconds(dt));
 
-    // 时间条自然衰减
-    m_timeRemaining -= config::TIME_DECAY_PER_SEC * dt;
-    if (m_timeRemaining < 0.0f) m_timeRemaining = 0.0f;
-    if (m_timeRemaining <= 0.0f) {
-        doGameOver(tr("时间到！！", "Out of time!!"), true);
-        return;
+    // 时间条：倒计时阶段（m_countdown >= 0）玩家还没开始砍，不衰减也不判负
+    if (m_countdown < 0) {
+        m_timeRemaining -= config::TIME_DECAY_PER_SEC * dt;
+        if (m_timeRemaining <= 0.0f) {
+            m_timeRemaining = 0.0f;
+            doGameOver(tr("时间到！！", "Out of time!!"), true);
+            return;
+        }
     }
 
     // 连击文字（>1 才显示）
@@ -234,6 +240,7 @@ void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
         m_player.die(m_playerSide);
     }
     m_drum.stop();
+    m_game.stopBgm();   // 结束时立刻停掉关卡 BGM，别让音乐继续盖在结算画面上
     // 所有结局（压死/时间到/通关）统一走结算：进入高分榜（是否上榜由 Game 主循环裁定）
     m_game.m_enterNamePending = true;
     m_game.m_gameOverClock.restart();

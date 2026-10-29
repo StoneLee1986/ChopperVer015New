@@ -106,7 +106,8 @@ void RhythmChopLevel::handleInput(Side side) {
         ++m_combo;
         if (m_combo > m_maxCombo) m_maxCombo = m_combo;
         m_score += perfect ? 100 : 50;
-        m_timeRemaining = std::min(config::START_TIME, m_timeRemaining + config::HIT_TIME_BONUS);
+        m_timeRemaining = std::min(config::START_TIME, m_timeRemaining +
+                                   (perfect ? config::HIT_TIME_PERFECT : config::HIT_TIME_GOOD));
         setJudge(perfect ? "完美" : "好", perfect ? "PERFECT" : "GOOD",
                  perfect ? Color::Yellow : Color::Green);
         // X 颜色反馈：perfect → 红；good → 白（鼓声每拍仍会放大，颜色只由判定决定）
@@ -222,6 +223,7 @@ void RhythmChopLevel::doGameOver(const sf::String& msg, bool playFailSound) {
         m_logActive = false;
     }
     m_drum.stop();
+    m_game.stopBgm();   // 结束时立刻停掉关卡 BGM，别让音乐继续盖在结算画面上
     if (m_game.m_scoreboard.qualifiesForHighscore(m_score)) {
         m_game.m_enterNamePending = true;
         m_game.m_gameOverClock.restart();
