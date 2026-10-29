@@ -36,6 +36,7 @@ private:
     void centerText(Text& t, float x, float y); // 把文字中心放到(x,y)（居中辅助）
     enum class MenuKind { Main, StageSelect, Pause }; // 菜单类型：主菜单 / 关卡选择 / 暂停
     void setupMenu(MenuKind kind);   // 按菜单类型填选项文字并重置选中项
+    void returnToMainMenu();         // 统一"回主菜单"：菜单文字/选中项/BGM 一起复位
     int  fillMenuText(MenuKind kind);// 填某类菜单的文字并返回选项数（语言刷新复用）
     void enterStage(config::GameMode mode); // 进入某关"按回车开始"准备界面（主/关卡选择共用）
     void applyLanguage();           // 语言切换时刷新 Game 自身界面文字（菜单/确认/分数）

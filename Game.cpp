@@ -197,8 +197,7 @@ void Game::processEvents() {
             if (!m_enterHeld) {
                 m_enterHeld = true;
                 m_scoreboard.close();
-                m_inMenu = true;   // 回主菜单
-                switchBgm(BgmState::Menu);   // 回主菜单就切回菜单 BGM
+                returnToMainMenu();   // 回主菜单（重填菜单文字 + 复位选中项 + 切菜单曲）
             }
         } else {
             m_enterHeld = false;
@@ -228,7 +227,7 @@ void Game::processEvents() {
             Keyboard::isKeyPressed(Keyboard::Escape));
         if (closed) {   // 设置界面请求关闭 → 按来源回主/暂停菜单
             if (m_settingsMenu.returnToPause()) m_inPauseMenu = true;  // 回暂停菜单
-            else                                m_inMenu = true;       // 回主菜单
+            else                                returnToMainMenu();    // 回主菜单
         }
         return;
     }
@@ -321,13 +320,7 @@ void Game::processEvents() {
                         startNewGame(m_mode);
                         break;
                     case 3:   // BACK TO MENU：放弃本局，回主菜单
-                        m_inPauseMenu = false;
-                        m_escPaused   = false;
-                        m_paused      = true;   // 主菜单阶段不推进游戏
-                        m_inMenu      = true;
-                        stopBgm();         // 停止当前关卡背景声
-                        switchBgm(BgmState::Menu);   // 回主菜单切回菜单 BGM
-                        setupMenu(MenuKind::Main);   // 填回主菜单选项
+                        returnToMainMenu();
                         break;
                     case 2:   // GAME SETTINGS：进入设置界面，返回时回暂停菜单
                         m_inPauseMenu = false;
@@ -464,6 +457,20 @@ void Game::setupMenu(Game::MenuKind kind) {
     fillMenuText(kind);
     m_menuSelection = 0;  // 每次进菜单默认选中第一项
     m_menuInputHeld = false;
+}
+
+// 统一"回主菜单"入口。
+// 以前有几条路径只置 m_inMenu = true（例如榜单按 Enter 关闭），但没重填菜单文字：
+// 结果主菜单里显示的仍是上一个界面（暂停菜单）的选项，选中项也停在旧值，
+// 按 Enter 就落到了"GAME SETTINGS"上 —— 表现为"回主菜单却进了设置"。
+void Game::returnToMainMenu() {
+    m_inMenu        = true;
+    m_inStageSelect = false;
+    m_inPauseMenu   = false;
+    m_escPaused     = false;
+    m_paused        = true;   // 主菜单阶段不推进游戏
+    if (m_currentBgm != BgmState::Menu) switchBgm(BgmState::Menu);
+    setupMenu(MenuKind::Main);   // 重填主菜单文字并复位选中项
 }
 
 // 语言切换时刷新 Game 自身界面文字（菜单/确认/分数），并传播到各子界面
