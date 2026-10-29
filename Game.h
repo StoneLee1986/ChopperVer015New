@@ -78,6 +78,11 @@ private:
     float m_fpsAccum  = 0.0f;   // 累计时间
     float m_fpsLastMs = 0.0f;   // 本帧耗时（毫秒）
     float m_fpsMaxMs  = 0.0f;   // 本轮统计窗口内的最差帧（毫秒）
+    float m_upMs      = 0.0f;   // 本帧逻辑耗时
+    float m_rndMs     = 0.0f;   // 本帧渲染耗时
+    float m_upMax     = 0.0f;   // 窗口内最差逻辑帧
+    float m_rndMax    = 0.0f;   // 窗口内最差渲染帧
+    Clock m_probeClock;         // 分段计时用
     int   m_lastScoreShown = -1; // 已显示过的分数，避免每帧重排文字
 
     // ---- 纹理（图片数据，一份就行，多个精灵共用；元素精灵放关卡内） ----

@@ -135,14 +135,18 @@ void Game::run() {
                 m_perfAccum = 0.0f; m_perfMax = 0.0f; m_perfFrames = 0;
             }
         }
+        // 分段计时：把一帧拆成"逻辑"和"渲染"两段，卡顿时能立刻判断是哪一段
+        m_probeClock.restart();
         if (!m_paused && !m_escPaused && !m_inMenu && !m_inPauseMenu && !m_confirmExit
             && !m_scoreboard.isOpen() && !m_nameUI.isActive() && !m_settingsMenu.isOpen()) {  // 不在任何菜单/输入/确认、没暂停才更新
             update(dt);
         } else {
             m_fx.update(dt.asSeconds());   // 结算画面/暂停菜单里：死亡爆发、慢动作继续播
         }
+        m_upMs = m_probeClock.restart().asSeconds() * 1000.0f;
         checkLanguage();   // 每次渲染前：语言切换实时刷新所有界面（含菜单/设置/榜单等非 update 状态）
-        render();   // 不管暂停与否都重画画面
+        render();          // 不管暂停与否都重画画面
+        m_rndMs = m_probeClock.restart().asSeconds() * 1000.0f;
     }
 }
 
@@ -624,19 +628,24 @@ void Game::render() {
         const float frameMs  = frameSec * 1000.0f;
         m_fpsLastMs = frameMs;
         if (frameMs > m_fpsMaxMs) m_fpsMaxMs = frameMs;
+        if (m_upMs  > m_upMax)  m_upMax  = m_upMs;
+        if (m_rndMs > m_rndMax) m_rndMax = m_rndMs;
         ++m_fpsFrames;
         m_fpsAccum += frameSec;
         if (m_fpsAccum >= 0.5f) {
             const int fps = static_cast<int>(m_fpsFrames / m_fpsAccum + 0.5f);
-            // 同时显示本帧耗时与 0.5 秒内的最差帧：判卡顿只看 FPS 会漏掉尖峰
-            char buf[96];
-            std::snprintf(buf, sizeof(buf), "FPS %d   %.1fms   max %.1fms",
-                          fps, static_cast<double>(m_fpsLastMs), static_cast<double>(m_fpsMaxMs));
+            // up=逻辑耗时 rnd=渲染耗时 max=窗口内最差（逻辑/渲染）
+            char buf[128];
+            std::snprintf(buf, sizeof(buf), "FPS %d  up %.1f rnd %.1f  max %.0f/%.0f",
+                          fps, static_cast<double>(m_upMs), static_cast<double>(m_rndMs),
+                          static_cast<double>(m_upMax), static_cast<double>(m_rndMax));
             m_fpsText.setString(buf);
             alignRow(m_fpsText, config::SCREEN_WIDTH - 20.0f, 20.0f, 2); // 文本变长需重对齐，否则右缘溢出屏幕
             m_fpsFrames = 0;
             m_fpsAccum  = 0.0f;
             m_fpsMaxMs  = 0.0f;
+            m_upMax     = 0.0f;
+            m_rndMax    = 0.0f;
         }
     }
     if (m_nameUI.isActive()) {
