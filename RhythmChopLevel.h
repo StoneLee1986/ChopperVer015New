@@ -18,6 +18,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
 #include <vector>
+#include "Beatmap.h"
 
 class Game;   // 前置声明：关卡类经 friend 访问 Game 私有成员
 
@@ -101,6 +102,8 @@ private:
     float m_pLeft  = config::RHYTHM_P_LEFT;
     float m_pRight = config::RHYTHM_P_RIGHT;
     float m_pNone  = config::RHYTHM_P_NONE;
+    Beatmap m_beatmap;        // 谱面数据
+    bool    m_useBeatmap = false;  // true=读谱面，false=概率 fallback
 };
 
 #endif

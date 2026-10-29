@@ -82,6 +82,13 @@ private:
     // ---- 音效 ----
     SoundBuffer m_soundBuffer;   // 砍树音效的音频数据
     Sound m_sound;               // 砍树音效播放器（关卡命中打击音效）
+    // ---- BGM（Chiptune 离线渲染 → SoundBuffer → Sound 循环播放） ----
+    sf::SoundBuffer m_bgmBufMenu;
+    sf::SoundBuffer m_bgmBufLevelA;
+    sf::SoundBuffer m_bgmBufLevelB;
+    sf::Sound       m_bgmPlayer;
+    enum class BgmState { None, Menu, LevelA, LevelB } m_currentBgm = BgmState::None;
+    void switchBgm(BgmState target);
 
     // ---- 游戏状态变量 ----
     bool  m_paused              = true;   // 是否暂停（开局是暂停的）

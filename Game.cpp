@@ -1,5 +1,7 @@
-﻿// CHOPPER - Game implementation
+// CHOPPER - Game implementation
 #include "Game.h"
+#include "bgm_songs.h"
+#include <SFML/Audio.hpp>
 
 Game::Game()
     : m_levelRhythm(*this),        // 关卡 A · 021 砍树驱动
@@ -375,6 +377,10 @@ void Game::startNewGame(config::GameMode mode) {
     m_escPaused = false; // 清掉可能的 Esc 暂停标记（重开一局时恢复为运行态）
     m_escHeld   = false; // 同时清掉 Esc 边沿检测标志
     m_acceptInput = true; // 可以开始按方向键了
+    if (mode == config::GameMode::ChopRhythm)
+        switchBgm(BgmState::LevelA);
+    else if (mode == config::GameMode::BeatDrive)
+        switchBgm(BgmState::LevelB);//切换关卡音乐
 
     // ---- 关卡状态复位：按 mode 绑定当前关卡并调用其 onStart（背景/树/小人/鼓声全在关卡内复位） ----
     switch (mode) {
@@ -396,6 +402,7 @@ void Game::enterStage(config::GameMode mode) {
     }
     m_level->stop();   // 准备界面(按 Enter 开始)不播放鼓声；真正开局时 startNewGame 的 onStart 才播放
     setMessage(tr("按回车开始", "Press Enter to Start"));
+    switchBgm(BgmState::Menu);
 }
 
 void Game::setMessage(const sf::String& text) {
@@ -490,9 +497,22 @@ void Game::checkLanguage() {
 }
 
 // 背景声统一分发：当前关卡自持鼓声（Esc 暂停/暂停菜单共用）
-void Game::pauseBgm() { if (m_level) m_level->pause(); }
-void Game::resumeBgm(){ if (m_level) m_level->resume(); }
-void Game::stopBgm()  { if (m_level) m_level->stop(); }
+void Game::pauseBgm() 
+{
+    m_bgmPlayer.pause(); 
+    if (m_level) m_level->pause();
+}
+void Game::resumeBgm()
+{
+    m_bgmPlayer.play(); 
+    if (m_level) m_level->resume();
+}
+void Game::stopBgm()
+{
+    m_bgmPlayer.stop(); 
+    m_currentBgm = BgmState::None;
+    if (m_level) m_level->stop();
+}
 
 void Game::alignRow(Text& t, float x, float y, int mode) {
     const FloatRect r = t.getLocalBounds();
@@ -628,6 +648,23 @@ void Game::loadAssets() {
         std::cerr << "[Warning] 音效加载失败: " << config::ASSET_CHOP_SOUND << "\n";
     else
         m_sound.setBuffer(m_soundBuffer);
+    // ---- BGM：Chiptune 离线渲染 → Int16 → SoundBuffer（每首只渲染一次） ----
+    auto loadBgm = [this](const chip::Song& song, sf::SoundBuffer& buf) {
+        const std::vector<float> f = chip::renderLooped(song, 1, config::SAMPLE_RATE);
+        std::vector<sf::Int16> pcm(f.size());
+        for (size_t i = 0; i < f.size(); ++i) {
+            const float v = std::max(-1.0f, std::min(1.0f, f[i]));
+            pcm[i] = static_cast<sf::Int16>(v * 32767.0f);
+        }
+        buf.loadFromSamples(pcm.data(), pcm.size(), 1, config::SAMPLE_RATE);
+    };
+    loadBgm(makeMenuSong(),   m_bgmBufMenu);
+    loadBgm(makeLevelASong(), m_bgmBufLevelA);
+    loadBgm(makeLevelBSong(), m_bgmBufLevelB);
+
+    m_bgmPlayer.setLoop(true);
+    m_bgmPlayer.setVolume(config::BGM_VOLUME);   // 背景层：只做铺垫
+    m_sound.setVolume(config::SFX_VOLUME);       // 打击音效：必须能听见
 }
 
 // ============================================================================
@@ -637,4 +674,19 @@ void Game::initScene() {
     // 两个关卡各自初始化（背景/树/小人/鼓声/斧头/圆木/提示框全在关卡内 initScene，互不共享可变状态）
     m_levelRhythm.initScene();
     m_levelBeat.initScene();
+}
+
+//实现 switchBgm()
+void Game::switchBgm(BgmState target) {
+    if (target == m_currentBgm) return;
+    m_bgmPlayer.stop();
+    switch (target) {
+    case BgmState::Menu:   m_bgmPlayer.setBuffer(m_bgmBufMenu); break;
+    case BgmState::LevelA: m_bgmPlayer.setBuffer(m_bgmBufLevelA); break;
+    case BgmState::LevelB: m_bgmPlayer.setBuffer(m_bgmBufLevelB); break;
+    case BgmState::None:   return;
+    }
+    m_bgmPlayer.setLoop(true);
+    m_bgmPlayer.play();
+    m_currentBgm = target;
 }

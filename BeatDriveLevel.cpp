@@ -336,17 +336,20 @@ void BeatDriveLevel::synthDrum() {
     const int pulseLen = static_cast<int>(0.18f * config::SAMPLE_RATE);  // 每个"咚"约 0.18s
     for (int k = 0; k < config::RHYTHM_DRUM_BEATS; ++k) {
         const int start = static_cast<int>(k * beat * config::SAMPLE_RATE);
+        double ph = 0.0;
         for (int j = 0; j < pulseLen && start + j < frames; ++j) {
-            const double t     = j / static_cast<double>(config::SAMPLE_RATE);
-            const double env   = std::exp(-t * 28.0);            // 快速衰减包络（鼓点感）
-            const double phase = 6.283185307 * 150.0 * t;        // 150Hz 低频"咚"
-            samples[start + j] = static_cast<Int16>(9000.0 * env * std::sin(phase));
+            const double t   = j / static_cast<double>(config::SAMPLE_RATE);
+            const double env = std::exp(-t * 24.0);
+            const double f   = 75.0 + 155.0 * std::exp(-t * 45.0);   // 230Hz 快速滑到 75Hz：有冲击力的"咚"
+            ph += 6.283185307179586 * f / config::SAMPLE_RATE;
+            samples[start + j] = static_cast<Int16>(20000.0 * env * std::sin(ph));
         }
     }
     if (!m_drumBuffer.loadFromSamples(samples.data(), static_cast<sf::Uint64>(samples.size()),
                                       1, config::SAMPLE_RATE))
         std::cerr << "[Warning] 节奏鼓点合成失败\n";
     m_drum.setBuffer(m_drumBuffer);
+    m_drum.setVolume(config::DRUM_VOLUME);   // 鼓声是判定基准，音量独立于 BGM
 }
 
 // 程序合成失败音效：柔和下行三连音（G4→E4→C4），替代全局难听的死亡音效（仅本关用）

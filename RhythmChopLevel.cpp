@@ -49,6 +49,9 @@ void RhythmChopLevel::initScene() {
 
 // 每局开始：复位全部状态 + 从头播放鼓声
 void RhythmChopLevel::onStart() {
+    // 加载谱面（文件不存在自动回退概率模式）
+    m_beatmap = Beatmap::load("beatmaps/rhythm_chop.json");
+    m_useBeatmap = !m_beatmap.empty();
     for (Side& b : m_branches) b = Side::None;   // 6 槽树枝清空
     m_player.reset();        // 小人回左边、墓碑藏起来（本关自控位置）
     m_playerSide   = Side::Left;                 // 小人回左边
@@ -118,7 +121,8 @@ void RhythmChopLevel::handleInput(Side side) {
 }
 
 // 每帧推进：节拍 tick + 树枝下落 + 字母动画 + 时间条 + 碰撞/结束判定
-void RhythmChopLevel::update(float dt) {
+void RhythmChopLevel::update(float dt)
+{
     if (m_dead || m_cleared) return;   // 已结束不再推进
 
     const float beat = 60.0f / config::RHYTHM_BPM;
@@ -126,13 +130,17 @@ void RhythmChopLevel::update(float dt) {
 
     // 跨拍检测：每过一拍（鼓声响起）只推进拍数用于通关计数 + X 放大缩小一次（鼓声驱动的节拍引导）
     while (m_currentBeat < config::RHYTHM_DRUM_BEATS &&
-           m_beatClock >= static_cast<float>(m_currentBeat + 1) * beat) {
+        m_beatClock >= static_cast<float>(m_currentBeat + 1) * beat)
+    {
         ++m_currentBeat;
         m_xPulse = 1.0f;   // 鼓声每响一次，X 放大缩小一次（提醒跟拍）
     }
 
-    // 32 拍走满＝通关（currentBeat 由独立时钟推进，必定走满，不再依赖 Sound 播放状态/offset）
-    if (m_currentBeat >= config::RHYTHM_DRUM_BEATS) {
+    // 通关判定：走满谱面（或拍数）→ 必须显式结算，否则画面会静止卡住
+    const int clearBeat = (m_useBeatmap && !m_beatmap.empty())
+                              ? static_cast<int>(m_beatmap.lastBeat()) + 1
+                              : config::RHYTHM_DRUM_BEATS;
+    if (m_currentBeat >= clearBeat) {
         m_cleared = true;
         doGameOver(tr("通关！", "CLEAR!"), false);   // 通关不播失败音
         return;
@@ -171,20 +179,26 @@ void RhythmChopLevel::update(float dt) {
         m_comboText.setString("");
     }
 }
-
-// 玩家砍树触发：全部槽位下移一格 + 顶部按概率生成新枝（原版：砍一次下落一次）
+// 玩家砍树触发：全部槽位下移一格
 void RhythmChopLevel::advanceBranches() {
+    // 全部槽位下移一格
     for (int i = config::RHYTHM_BRANCH_COUNT - 1; i > 0; --i)
-        m_branches[i] = m_branches[i - 1];   // 下移一格
+        m_branches[i] = m_branches[i - 1];
 
-    // 顶部按概率接口生成新枝（默认 左45/右45/无10）
-    const int r  = static_cast<int>(m_game.m_rng() % 1000);
-    const int l  = static_cast<int>(m_pLeft  * 1000.0f);
-    const int rp = static_cast<int>(m_pRight * 1000.0f);
-    if      (r < l)              m_branches[0] = Side::Left;
-    else if (r < l + rp)         m_branches[0] = Side::Right;
-    else                         m_branches[0] = Side::None;
+    // 顶部（槽位0）按谱面或概率生成
+    if (m_useBeatmap) {
+        const Note* note = m_beatmap.query((float)m_currentBeat, 0.5f);
+        m_branches[0] = note ? note->side : Side::None;
+    }
+    else {
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+        float r = dist(m_game.m_rng);
+        if (r < m_pLeft)           m_branches[0] = Side::Left;
+        else if (r < m_pLeft + m_pRight) m_branches[0] = Side::Right;
+        else                        m_branches[0] = Side::None;
+    }
 }
+
 
 // 碰撞：最底层(玩家层)树枝与玩家同侧 → 被压死（树枝撞到玩家，原版判定）
 void RhythmChopLevel::checkCollision() {
@@ -256,45 +270,85 @@ void RhythmChopLevel::renderUI(sf::RenderWindow& w) {
 
 // 程序合成 60BPM 规律鼓声（节拍器"咚"，每拍一个低频短脉冲；无需外部音频文件）
 void RhythmChopLevel::synthDrum() {
-    const float beat = 60.0f / config::RHYTHM_BPM;               // 一拍 = 1.0s
-    const float total = config::RHYTHM_DRUM_BEATS * beat;        // 整段时长
-    const int frames = static_cast<int>(total * config::SAMPLE_RATE);
-    std::vector<Int16> samples(frames, 0);
-    const int pulseLen = static_cast<int>(0.18f * config::SAMPLE_RATE);  // 每个"咚"约 0.18s
+    // 1. 基础参数校验
+    if (config::RHYTHM_BPM <= 0 || config::RHYTHM_DRUM_BEATS <= 0 || config::SAMPLE_RATE <= 0) {
+        std::cerr << "[Error] synthDrum 参数无效 (BPM/Beats/SampleRate)\n";
+        return;
+    }
+
+    const float beat   = 60.0f / config::RHYTHM_BPM;
+    const float total  = config::RHYTHM_DRUM_BEATS * beat;   // 32 拍 × 1.0s = 32 秒
+    const int   frames = static_cast<int>(total * config::SAMPLE_RATE);
+
+    // 2. 安全分配
+    std::vector<Int16> samples(static_cast<size_t>(frames), 0);
+
+    // 4. 合成鼓点
+    const int pulseLen = static_cast<int>(0.18f * config::SAMPLE_RATE);
     for (int k = 0; k < config::RHYTHM_DRUM_BEATS; ++k) {
         const int start = static_cast<int>(k * beat * config::SAMPLE_RATE);
+        double ph = 0.0;
         for (int j = 0; j < pulseLen && start + j < frames; ++j) {
-            const double t     = j / static_cast<double>(config::SAMPLE_RATE);
-            const double env   = std::exp(-t * 28.0);            // 快速衰减包络（鼓点感）
-            const double phase = 6.283185307 * 150.0 * t;        // 150Hz 低频"咚"
-            samples[start + j] = static_cast<Int16>(9000.0 * env * std::sin(phase));
+            const double t   = j / static_cast<double>(config::SAMPLE_RATE);
+            const double env = std::exp(-t * 24.0);
+            const double f   = 75.0 + 155.0 * std::exp(-t * 45.0);   // 230Hz 快速滑到 75Hz：有冲击力的"咚"
+            ph += 6.283185307179586 * f / config::SAMPLE_RATE;
+            samples[start + j] = static_cast<Int16>(20000.0 * env * std::sin(ph));
         }
     }
-    if (!m_drumBuffer.loadFromSamples(samples.data(), static_cast<sf::Uint64>(samples.size()),
-                                      1, config::SAMPLE_RATE))
-        std::cerr << "[Warning] 节奏鼓点合成失败\n";
+
+    // 5. 加载到 SoundBuffer（SFML 会拷贝，安全）
+    if (!m_drumBuffer.loadFromSamples(samples.data(),
+        static_cast<sf::Uint64>(samples.size()),
+        1, config::SAMPLE_RATE)) {
+        std::cerr << "[Warning] 节奏鼓点合成失败 (loadFromSamples)\n";
+    }
     m_drum.setBuffer(m_drumBuffer);
+    m_drum.setVolume(config::DRUM_VOLUME);   // 鼓声是判定基准，音量独立于 BGM
 }
 
 // 程序合成失败音效：柔和下行三连音（G4→E4→C4），替代全局难听的死亡音效（仅本关用）
 void RhythmChopLevel::synthFailSound() {
-    const float freqs[3] = { 392.0f, 330.0f, 262.0f };   // G4 → E4 → C4 下行提示
-    const float noteLen = 0.12f;                          // 每个音 0.12s
-    const int frames = static_cast<int>((3 * noteLen + 0.05f) * config::SAMPLE_RATE);
-    std::vector<Int16> samples(frames, 0);
+    const float freqs[3] = { 392.0f, 330.0f, 262.0f }; // G4→E4→C4
+    const float noteLen = 0.12f;
+    const float total = 3 * noteLen + 0.05f;
+
+    if (config::SAMPLE_RATE <= 0 || total <= 0.0f || total > 5.0f) {
+        std::cerr << "[Error] synthFailSound 参数异常\n";
+        return;
+    }
+
+    const int frames = static_cast<int>(total * config::SAMPLE_RATE);
+    if (frames <= 0 || frames > 220500) { // 44100 * 5
+        std::cerr << "[Error] synthFailSound 采样数异常: " << frames << "\n";
+        return;
+    }
+
+    std::vector<Int16> samples;
+    try {
+        samples.resize(frames, 0);
+    }
+    catch (const std::bad_alloc&) {
+        std::cerr << "[Error] synthFailSound 内存分配失败\n";
+        return;
+    }
+
     for (int n = 0; n < 3; ++n) {
         const int start = static_cast<int>(n * noteLen * config::SAMPLE_RATE);
-        const int len   = static_cast<int>(noteLen * config::SAMPLE_RATE);
+        const int len = static_cast<int>(noteLen * config::SAMPLE_RATE);
         for (int j = 0; j < len && start + j < frames; ++j) {
-            const double t     = j / static_cast<double>(config::SAMPLE_RATE);
-            const double env   = 1.0 - static_cast<double>(j) / len;   // 线性衰减
+            const double t = j / static_cast<double>(config::SAMPLE_RATE);
+            const double env = 1.0 - static_cast<double>(j) / len;
             const double phase = 6.283185307 * freqs[n] * t;
             samples[start + j] = static_cast<Int16>(5000.0 * env * std::sin(phase));
         }
     }
-    if (!m_failBuffer.loadFromSamples(samples.data(), static_cast<sf::Uint64>(samples.size()),
-                                      1, config::SAMPLE_RATE))
+
+    if (!m_failBuffer.loadFromSamples(samples.data(),
+        static_cast<sf::Uint64>(samples.size()),
+        1, config::SAMPLE_RATE)) {
         std::cerr << "[Warning] 失败音效合成失败\n";
+    }
     m_fail.setBuffer(m_failBuffer);
 }
 

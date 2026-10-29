@@ -59,6 +59,11 @@ namespace config {
     static const char* const FRAMERATE_NAMES[FRAMERATE_COUNT] = { "AUTO","60","120","144","240","UNLIMITED" };
     constexpr int   FPS_SHOW_DEFAULT = 1;    // 默认显示内置 FPS（验证高刷新率；游戏完成后再考虑去掉）
 
+    // ---- 音量（0..100）：三层结构，鼓点是节奏锚点必须压过 BGM ----
+    constexpr float  BGM_VOLUME   = 26.0f;   // 背景音乐：只做铺垫，绝不能盖住鼓点
+    constexpr float  DRUM_VOLUME  = 92.0f;   // 关卡鼓声：判定唯一的听觉基准
+    constexpr float  SFX_VOLUME   = 60.0f;   // 打击音效（chop.wav）
+
     // ---- 音频采样率与判定窗口（节奏鼓点关共用） ----
     constexpr int    SAMPLE_RATE      = 44100;     // 采样率
     constexpr float  AUDIO_SYNC_ENABLED    = true;   // 启用音频同步（自动检测音轨偏移）

@@ -62,6 +62,7 @@ struct Channel {
 struct Song {
     int bpm = 120;
     int rowsPerBeat = 4;          // 1 行 = 1/4 拍 = 16 分音符
+    float gain = 1.0f;            // 整曲增益：BGM 用它压到背景层（0..1）
     std::vector<Channel> channels;
 };
 

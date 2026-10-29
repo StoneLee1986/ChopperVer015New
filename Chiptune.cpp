@@ -2,7 +2,6 @@
 //  Chiptune.cpp：NES 风格合成器实现（纯 C++，无第三方依赖）
 // ============================================================================
 #include "Chiptune.h"
-
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -242,7 +241,7 @@ std::vector<float> render(const Song& song, int sampleRate) {
     }
 
     // 软限幅 + 首尾 2ms 淡入淡出（避免循环接缝处的爆音）
-    const float g = 0.55f;
+    const float g = 0.55f * std::max(0.0f, song.gain);
     for (float& v : mix) v = std::tanh(v * g) * 0.92f;
 
     const long fade = std::min<long>(static_cast<long>(0.002f * static_cast<float>(sr)), static_cast<long>(mix.size()) / 2);
@@ -256,10 +255,16 @@ std::vector<float> render(const Song& song, int sampleRate) {
 
 std::vector<float> renderLooped(const Song& song, int loops, int sampleRate) {
     const std::vector<float> one = render(song, sampleRate);
-    const int n = std::max(1, loops);
+
+    // 上限 64 次纯属防御失控分配，正常 BGM 只用 1~2 次
+    const int    safeLoops = std::max(1, std::min(loops, 64));
+    const size_t n         = static_cast<size_t>(safeLoops);
+
     std::vector<float> out;
-    out.reserve(one.size() * static_cast<size_t>(n));
-    for (int i = 0; i < n; ++i) out.insert(out.end(), one.begin(), one.end());
+    out.reserve(one.size() * n);
+    for (size_t i = 0; i < n; ++i) {
+        out.insert(out.end(), one.begin(), one.end());
+    }
     return out;
 }
 

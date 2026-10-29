@@ -15,49 +15,85 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\config.h">
+    <ClInclude Include="config.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\DisplayManager.h">
+    <ClInclude Include="Chiptune.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\Game.h">
+    <ClInclude Include="BeatDriveLevel.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\MusicSystem.h">
+    <ClInclude Include="DisplayManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\NameEntryUI.h">
+    <ClInclude Include="Game.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\Scoreboard.h">
+    <ClInclude Include="ILevel.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\SettingsMenu.h">
+    <ClInclude Include="Player.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RhythmChopLevel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scenery.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="NameEntryUI.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Scoreboard.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingsMenu.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Beatmap.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="bgm_songs.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\DisplayManager.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="Chiptune.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\Game.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="DisplayManager.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\LoggerV0.15.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="BeatDriveLevel.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\MusicSystem.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="Game.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\NameEntryUI.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="Player.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\Scoreboard.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="RhythmChopLevel.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\lansh\Doubao\chats\2026-10-24\new-chat\LoggerV0.15\SettingsMenu.cpp">
-      <Filter>头文件</Filter>
+    <ClCompile Include="Scenery.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="LoggerV0.15.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="NameEntryUI.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Scoreboard.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="SettingsMenu.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Beatmap.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
