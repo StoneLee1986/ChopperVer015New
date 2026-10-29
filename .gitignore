@@ -369,3 +369,9 @@ SFML2/examples/
 # Baidu cloud sync conflict copies
 *_conflict_*
 *_鍐茬獊鏂囦欢_*
+
+# chiptune 试听工具产物
+tools/out/
+tools/*.exe
+tools/*.obj
+
