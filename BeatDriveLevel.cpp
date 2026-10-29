@@ -93,8 +93,13 @@ void BeatDriveLevel::handleInput(Side side) {
     // 玩家按对(移到反侧)躲开即将压到的那根树枝(index4)：它已用过，立即消失，避免停在玩家层干扰
     const int  pending  = config::RHYTHM_BRANCH_COUNT - 2;
     const Side incoming = m_branches[pending].side;
-    if (incoming != Side::None && incoming != side)
+    if (incoming != Side::None && incoming != side) {
         m_branches[pending] = { Side::None, 1.0f };   // 躲开 → 该树枝立即清除（红框随之消失）
+        // 特效：躲开瞬间的白色冲击环
+        m_game.m_fx.ring(Vector2f(side == Side::Left ? config::PLAYER_LEFT_X : config::PLAYER_RIGHT_X,
+                                  config::PLAYER_Y - 80.0f),
+                         sf::Color(200, 230, 255, 190), 20.0f, 170.0f, 0.3f);
+    }
 
     // 倒计时阶段（m_countdown >= 0）：玩家还没真正开始，只响应站位移动，不判定也不计时
     if (m_countdown >= 0) return;
@@ -117,10 +122,15 @@ void BeatDriveLevel::handleInput(Side side) {
         m_logVx = (side == Side::Left ? 1.0f : -1.0f) * config::RHYTHM_LOG_VX;  // 砍左→向右飞、砍右→向左飞
         m_logVy = config::RHYTHM_LOG_VY;                                          // 原版向上初速
         m_logActive = true;
+        // 特效：命中木屑 + 冲击环 + 轻震 + 定格
+        m_game.m_fx.hit(Vector2f(side == Side::Left ? config::RHYTHM_AXE_LEFT_X
+                                                    : config::RHYTHM_AXE_RIGHT_X,
+                                 config::RHYTHM_AXE_Y), perfect);
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
         m_timeRemaining -= config::MISS_TIME_PENALTY;
         setJudge("失误", "MISS", Color::Red);
+        m_game.m_fx.miss();                        // 特效：红闪 + 震屏
     }
 }
 
@@ -138,6 +148,7 @@ void BeatDriveLevel::update(float dt) {
     while (m_currentBeat < config::RHYTHM_DRUM_BEATS &&
            m_beatClock >= static_cast<float>(m_currentBeat + 1) * beat) {
         ++m_currentBeat;
+        m_game.m_fx.beatPulse();   // 特效：每拍画面脉冲（视觉节拍器，听不见也能跟拍）
         advanceBranches();
         checkCollision();      // 撞死会置 m_dead 并结算
         if (m_dead || m_cleared) return;   // 增加 m_cleared 检查
@@ -235,6 +246,9 @@ void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_logActive = false;
     if (playFailSound) {
+        m_game.m_fx.death(Vector2f(m_playerSide == Side::Left ? config::PLAYER_LEFT_X
+                                                              : config::PLAYER_RIGHT_X,
+                                   config::PLAYER_Y));
         m_fail.play();
         // 失败（压死/时间到）：小人移出屏幕、墓碑留在该侧（通关保留小人画面）
         m_player.die(m_playerSide);

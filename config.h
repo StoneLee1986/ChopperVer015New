@@ -59,6 +59,11 @@ namespace config {
     static const char* const FRAMERATE_NAMES[FRAMERATE_COUNT] = { "AUTO","60","120","144","240","UNLIMITED" };
     constexpr int   FPS_SHOW_DEFAULT = 1;    // 默认显示内置 FPS（验证高刷新率；游戏完成后再考虑去掉）
 
+    // ---- 特效强度（当前为「中等」档；轻 0.6 / 中 1.0 / 重 1.6） ----
+    constexpr float FX_SHAKE_SCALE  = 1.0f;     // 屏幕震动倍率
+    constexpr float FX_HITSTOP_SEC  = 0.045f;   // 命中定格（秒），0 = 关闭
+    constexpr bool  FX_CRT_ENABLED  = false;    // CRT 扫描线（默认关闭，可在设置里开）
+
     // ---- 音量（0..100）：三层结构，鼓点是节奏锚点必须压过 BGM ----
     constexpr float  BGM_VOLUME   = 26.0f;   // 背景音乐：只做铺垫，绝不能盖住鼓点
     constexpr float  DRUM_VOLUME  = 92.0f;   // 关卡鼓声：判定唯一的听觉基准

@@ -98,6 +98,7 @@
     <ClInclude Include="bgm_songs.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="Chiptune.h" />
+    <ClInclude Include="Fx.h" />
     <ClInclude Include="BeatDriveLevel.h" />
     <ClInclude Include="DisplayManager.h" />
     <ClInclude Include="Game.h" />
@@ -112,6 +113,7 @@
   <ItemGroup>
     <ClCompile Include="Beatmap.cpp" />
     <ClCompile Include="Chiptune.cpp" />
+    <ClCompile Include="Fx.cpp" />
     <ClCompile Include="DisplayManager.cpp" />
     <ClCompile Include="BeatDriveLevel.cpp" />
     <ClCompile Include="Game.cpp" />

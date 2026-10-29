@@ -113,10 +113,15 @@ void RhythmChopLevel::handleInput(Side side) {
         // X 颜色反馈：perfect → 红；good → 白（鼓声每拍仍会放大，颜色只由判定决定）
         m_letterText.setFillColor(perfect ? Color::Red : Color::White);
         if (perfect) m_xPulse = 1.0f;   // perfect：X 额外放大一次强调
+        // 特效：木屑迸溅 + 冲击环 + 轻震 + 命中定格
+        m_game.m_fx.hit(Vector2f(side == Side::Left ? config::RHYTHM_AXE_LEFT_X
+                                                    : config::RHYTHM_AXE_RIGHT_X,
+                                 config::RHYTHM_AXE_Y), perfect);
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
         m_timeRemaining -= config::MISS_TIME_PENALTY;
         setJudge("失误", "MISS", Color::Red);
+        m_game.m_fx.miss();                        // 特效：红闪 + 震屏
         m_letterText.setFillColor(Color::White);   // 失误 → X 回白
     }
 }
@@ -216,6 +221,9 @@ void RhythmChopLevel::doGameOver(const sf::String& msg, bool playFailSound) {
     m_game.m_paused = true;
     m_game.setMessage(msg);
     if (playFailSound) {
+        m_game.m_fx.death(Vector2f(m_playerSide == Side::Left ? config::PLAYER_LEFT_X
+                                                              : config::PLAYER_RIGHT_X,
+                                   config::PLAYER_Y));
         m_fail.play();
         // 失败（压死/时间到）统一让斧头/圆木消失，避免残留画面
         m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);

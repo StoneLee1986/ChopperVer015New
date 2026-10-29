@@ -101,10 +101,12 @@ void Game::run() {
             else
                 m_scoreboard.open();                // 不上榜也统一跳高分榜
         }
+        const Time dt = m_clock.restart();  // 每帧都取耗时：暂停时特效能继续演完
         if (!m_paused && !m_escPaused && !m_inMenu && !m_inPauseMenu && !m_confirmExit
             && !m_scoreboard.isOpen() && !m_nameUI.isActive() && !m_settingsMenu.isOpen()) {  // 不在任何菜单/输入/确认、没暂停才更新
-            Time dt = m_clock.restart();  // 这一帧耗时
             update(dt);
+        } else {
+            m_fx.update(dt.asSeconds());   // 结算画面/暂停菜单里：死亡爆发、慢动作继续播
         }
         checkLanguage();   // 每次渲染前：语言切换实时刷新所有界面（含菜单/设置/榜单等非 update 状态）
         render();   // 不管暂停与否都重画画面
@@ -527,8 +529,21 @@ void Game::alignRow(Text& t, float x, float y, int mode) {
 
 void Game::update(const Time& dt) {
     if (!m_level) return;   // 未进入关卡（防御性保护；正常 update 只在游戏阶段调用，m_level 已绑定）
+    const float realDt = dt.asSeconds();        // 真实帧时间
+    const float scale  = m_fx.timeScale();      // 1 = 正常，≈0 = 命中定格，<1 = 慢动作
+    float gameDt = realDt * scale;
+    if (scale < 0.999f) {
+        // 定格/慢动作：把被"冻住"的时间记成欠账，稍后补回，节拍时钟才不会越打越偏
+        m_dtDebt += realDt * (1.0f - scale);
+    } else if (m_dtDebt > 0.0f) {
+        // 每帧最多多补 50%：平滑追平，不会出现肉眼可见的跳帧
+        const float pay = std::min(m_dtDebt, realDt * 0.5f);
+        gameDt += pay;
+        m_dtDebt -= pay;
+    }
     // 当前关卡完全自包含：节拍tick/树枝/字母/圆木/背景/时间/碰撞/结算全在关卡内
-    m_level->update(dt.asSeconds());
+    m_level->update(gameDt);
+    m_fx.update(realDt);                        // 特效用真实时间推进（内部再按 timeScale 缩放粒子）
     // 时间条与分数由关卡数值驱动
     m_timeBar.setSize(Vector2f(m_level->timeBarWidthPerSecond() * m_level->timeRemaining(),
                                config::TIME_BAR_HEIGHT));
@@ -612,12 +627,21 @@ void Game::render() {
         m_disp.window().display();
         return;
     }
-    m_level->renderScene(m_disp.window());   // 关卡画全部场景（背景/云/蜜蜂→树→树枝→小人/墓碑→圆木→斧头）
+    // 关卡场景：整体带屏幕震动偏移（HUD 不跟着抖）
+    {
+        View shakeView = m_disp.view();
+        shakeView.move(m_fx.shakeOffset());
+        m_disp.window().setView(shakeView);
+    }
+    m_level->renderScene(m_disp.window());   // 关卡画全部场景（背景/云/蜜蜂→树/树枝/小人/墓碑/圆木/斧头）
+    m_fx.drawScene(m_disp.window());         // 粒子与冲击环：场景之上、HUD 之下
+    m_disp.window().setView(m_disp.view());  // 恢复视图，HUD 不抖
     m_disp.window().draw(m_scoreText);
     m_level->renderUI(m_disp.window());      // 关卡画 HUD（提示框/A·B字母/判定/连击）
     m_disp.window().draw(m_timeBar);
     if (m_paused || m_escPaused)
         m_disp.window().draw(m_messageText); // 暂停（含 Esc 手动暂停）时画中央提示
+    m_fx.drawOverlay(m_disp.window());       // 闪光/鼓点脉冲/CRT：最上层
     if (m_disp.showFps()) m_disp.window().draw(m_fpsText);
     m_disp.window().display();
 }
