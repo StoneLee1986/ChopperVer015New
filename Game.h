@@ -37,6 +37,7 @@ private:
     enum class MenuKind { Main, StageSelect, Pause }; // 菜单类型：主菜单 / 关卡选择 / 暂停
     void setupMenu(MenuKind kind);   // 按菜单类型填选项文字并重置选中项
     void returnToMainMenu();         // 统一"回主菜单"：菜单文字/选中项/BGM 一起复位
+    void endRound(const sf::String& msg, bool failed); // 统一"结束本局"：暂停/提示/停乐/进结算
     int  fillMenuText(MenuKind kind);// 填某类菜单的文字并返回选项数（语言刷新复用）
     void enterStage(config::GameMode mode); // 进入某关"按回车开始"准备界面（主/关卡选择共用）
     void applyLanguage();           // 语言切换时刷新 Game 自身界面文字（菜单/确认/分数）
@@ -138,6 +139,11 @@ private:
     // ---- 特效系统（关卡经 friend 访问；震动/闪光/hit-stop 统一在这里） ----
     Fx m_fx;
     float m_dtDebt = 0.0f;   // hit-stop 欠下的时间，下一帧补回，保证节拍时钟不漂移
+
+    // ---- 帧耗时统计（perf.log，定位卡顿用） ----
+    float m_perfAccum  = 0.0f;
+    float m_perfMax    = 0.0f;
+    int   m_perfFrames = 0;
 };
 
 #endif

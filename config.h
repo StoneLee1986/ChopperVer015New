@@ -63,6 +63,7 @@ namespace config {
     constexpr float FX_SHAKE_SCALE  = 1.0f;     // 屏幕震动倍率
     constexpr float FX_HITSTOP_SEC  = 0.045f;   // 命中定格（秒），0 = 关闭
     constexpr bool  FX_CRT_ENABLED  = false;    // CRT 扫描线（默认关闭，可在设置里开）
+    constexpr bool  PERF_LOG        = true;     // 每 2 秒把帧耗时写进 perf.log（排查卡顿用）
 
     // ---- 音量（0..100）：三层结构，鼓点是节奏锚点必须压过 BGM ----
     constexpr float  BGM_VOLUME   = 26.0f;   // 背景音乐：只做铺垫，绝不能盖住鼓点

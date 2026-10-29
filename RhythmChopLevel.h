@@ -94,6 +94,7 @@ private:
     Clock m_judgeClock;                // 判定文字显示计时
 
     // ---- 得分 / 时间条（沿用现有机制：开局 12s，命中回血、Miss 扣血、每秒自然衰减） ----
+    bool  m_ended = false;   // 结算互斥：压死/超时/通关只执行最先触发的那一种
     int   m_score = 0, m_combo = 0, m_maxCombo = 0;
     float m_timeRemaining = config::START_TIME;
     float m_timeBarWidthPerSecond = config::TIME_BAR_WIDTH / config::START_TIME;

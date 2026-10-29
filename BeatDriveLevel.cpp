@@ -233,15 +233,11 @@ void BeatDriveLevel::checkCollision() {
     }
 }
 
-// 结束本局（死亡/时间到/通关）：停帧 + 提示(带得分) + 失败音效(可选) + 清理残留 + 上榜结算
+// 结束本局：只做本关特有的收尾（失败音、小人倒下、清残留），共用逻辑交给 Game::endRound
 void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
     if (m_ended) return;              // 结算互斥：三种结局只执行最先触发的那一种
     m_ended = true;
-    m_game.m_paused = true;
-    // 结束画面消息带本局得分（通关/压死/时间到都显示，结算更明确）
-    m_game.setMessage(msg + sf::String(" ") +
-                      sf::String(std::to_string(m_score)) + sf::String(tr("分", "pts")));
-    // 任何结束状态（压死/时间到/通关）都清理残留的斧头与圆木，避免停在画面干扰
+    // 任何结束状态都清理残留的斧头与圆木，避免停在画面干扰
     m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_logActive = false;
@@ -253,11 +249,9 @@ void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
         // 失败（压死/时间到）：小人移出屏幕、墓碑留在该侧（通关保留小人画面）
         m_player.die(m_playerSide);
     }
-    m_drum.stop();
-    m_game.stopBgm();   // 结束时立刻停掉关卡 BGM，别让音乐继续盖在结算画面上
-    // 所有结局（压死/时间到/通关）统一走结算：进入高分榜（是否上榜由 Game 主循环裁定）
-    m_game.m_enterNamePending = true;
-    m_game.m_gameOverClock.restart();
+    // 结束画面消息带本局得分（通关/压死/时间到都显示，结算更明确）
+    m_game.endRound(msg + sf::String(" ") + sf::String(std::to_string(m_score)) +
+                    sf::String(tr("分", "pts")), playFailSound);
 }
 
 // 画本关全部场景（背景/云/蜜蜂 → 树 → 树枝 → 小人/墓碑 → 圆木 → 斧头）

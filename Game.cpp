@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "bgm_songs.h"
 #include <SFML/Audio.hpp>
+#include <cstdlib>
 
 Game::Game()
     : m_levelRhythm(*this),        // 关卡 A · 021 砍树驱动
@@ -102,6 +103,27 @@ void Game::run() {
                 m_scoreboard.open();                // 不上榜也统一跳高分榜
         }
         const Time dt = m_clock.restart();  // 每帧都取耗时：暂停时特效能继续演完
+        // ---- 帧耗时统计：每 2 秒一行写进 perf.log（判断卡顿是引擎还是环境） ----
+        if (config::PERF_LOG) {
+            const float ms = dt.asSeconds() * 1000.0f;
+            m_perfAccum += ms;
+            ++m_perfFrames;
+            if (ms > m_perfMax) m_perfMax = ms;
+            if (m_perfAccum >= 2000.0f) {
+                // 写到系统临时目录，避免放在 OneDrive 里反复触发同步（那本身就会造成卡顿）
+                char* tmp = nullptr;
+                size_t tmpLen = 0;
+                _dupenv_s(&tmp, &tmpLen, "TEMP");
+                const std::string path = std::string(tmp ? tmp : ".") + "/chopper_perf.log";
+                if (tmp) free(tmp);
+                std::ofstream f(path, std::ios::app);
+                if (f) f << "avg=" << (m_perfAccum / static_cast<float>(m_perfFrames))
+                         << "ms max=" << m_perfMax
+                         << "ms frames=" << m_perfFrames
+                         << " pause=" << (m_paused ? 1 : 0) << "\n";
+                m_perfAccum = 0.0f; m_perfMax = 0.0f; m_perfFrames = 0;
+            }
+        }
         if (!m_paused && !m_escPaused && !m_inMenu && !m_inPauseMenu && !m_confirmExit
             && !m_scoreboard.isOpen() && !m_nameUI.isActive() && !m_settingsMenu.isOpen()) {  // 不在任何菜单/输入/确认、没暂停才更新
             update(dt);
@@ -471,6 +493,18 @@ void Game::returnToMainMenu() {
     m_paused        = true;   // 主菜单阶段不推进游戏
     if (m_currentBgm != BgmState::Menu) switchBgm(BgmState::Menu);
     setupMenu(MenuKind::Main);   // 重填主菜单文字并复位选中项
+}
+
+// 统一"结束本局"入口：两个关卡的 doGameOver 都只做本关特有的收尾
+// （停音效、藏斧头、小人倒下），共用逻辑全部收敛到这里。
+// 以前这些状态分散在两个关卡里各写一遍，很容易改漏一条路径。
+void Game::endRound(const sf::String& msg, bool failed) {
+    (void)failed;                    // 目前两种结局的共用处理一致；保留参数便于以后区分
+    m_paused = true;                 // 冻结游戏推进（但特效仍会继续演）
+    setMessage(msg);
+    stopBgm();                       // 停掉关卡鼓声 + BGM，结算画面上不再有音乐
+    m_enterNamePending = true;       // 是否上榜由主循环按分数裁定
+    m_gameOverClock.restart();
 }
 
 // 语言切换时刷新 Game 自身界面文字（菜单/确认/分数），并传播到各子界面

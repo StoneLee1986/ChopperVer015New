@@ -61,7 +61,7 @@ void RhythmChopLevel::onStart() {
     m_timeRemaining = config::START_TIME;
     m_currentBeat = 0;
     m_beatClock   = 0.0f;   // 独立节拍时钟归零（与鼓声同步起跑）
-    m_cleared = false; m_dead = false;
+    m_cleared = false; m_dead = false; m_ended = false;
     m_logActive = false;   // 圆木复位（隐藏）
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头开局隐藏（砍击时才出现）
@@ -216,10 +216,10 @@ void RhythmChopLevel::checkCollision() {
     }
 }
 
-// 结束本局（死亡/时间到/通关）：停帧 + 提示 + 失败音效(可选) + 上榜结算
+// 结束本局：只做本关特有的收尾（失败音、藏斧头/圆木），共用逻辑交给 Game::endRound
 void RhythmChopLevel::doGameOver(const sf::String& msg, bool playFailSound) {
-    m_game.m_paused = true;
-    m_game.setMessage(msg);
+    if (m_ended) return;   // 互斥：压死/超时/通关只执行最先触发的那一种
+    m_ended = true;
     if (playFailSound) {
         m_game.m_fx.death(Vector2f(m_playerSide == Side::Left ? config::PLAYER_LEFT_X
                                                               : config::PLAYER_RIGHT_X,
@@ -230,12 +230,7 @@ void RhythmChopLevel::doGameOver(const sf::String& msg, bool playFailSound) {
         m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
         m_logActive = false;
     }
-    m_drum.stop();
-    m_game.stopBgm();   // 结束时立刻停掉关卡 BGM，别让音乐继续盖在结算画面上
-    if (m_game.m_scoreboard.qualifiesForHighscore(m_score)) {
-        m_game.m_enterNamePending = true;
-        m_game.m_gameOverClock.restart();
-    }
+    m_game.endRound(msg, playFailSound);   // 暂停 + 提示 + 停乐 + 结算计时
 }
 
 // 画本关全部场景（背景/云/蜜蜂 → 树 → 树枝 → 小人/墓碑 → 圆木 → 斧头）
