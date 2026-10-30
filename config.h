@@ -141,7 +141,7 @@ namespace config {
     constexpr float  RHYTHM_LOG_VX      = 5000.0f;  // 圆木水平飞出速度（原版极速，飞出干脆）
     constexpr float  RHYTHM_LOG_VY      = -1500.0f; // 圆木垂直初速（原版向上，负号=屏幕上方）
     constexpr float  RHYTHM_LOG_SCALE   = 0.6f;     // 圆木显示缩放（0.35 太小放大到约 180x72，醒目但不过大）
-    constexpr float  RHYTHM_BRANCH_GROW_PER_SLOT = 1.02f; // 树枝每靠近玩家一槽放大倍数(+2%)，越近越大营造压迫感
+    constexpr float  RHYTHM_BRANCH_GROW_PER_SLOT = 1.04f; // 树枝每靠近玩家一槽放大倍数(+4%)，越近越大营造压迫感
 
     // ---- 树（静态完整树，关卡 1·节奏鼓点自持；本关不倒/不变细） ----
     constexpr float TREE_ANCHOR_X   = TREE_X + 150.0f;  // 树底部锚点 X = 960（贴图中心）
