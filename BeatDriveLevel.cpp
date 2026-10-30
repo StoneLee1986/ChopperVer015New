@@ -75,6 +75,7 @@ void BeatDriveLevel::onStart() {
     m_beatClock   = 0.0f;   // 独立节拍时钟归零（与鼓声同步起跑）
     m_cleared = false; m_dead = false; m_ended = false;   // 结算锁复位
     m_assistAsked = false; m_assistOn = false;            // 每局重新询问代打
+    m_missStreak  = 0;
     m_logActive = false;   // 圆木复位（隐藏）
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头开局隐藏（砍击时才出现）
@@ -87,6 +88,7 @@ void BeatDriveLevel::handleInput(Side side) {
     if (m_ended) return;   // 已结算：不再响应按键（防结算后按键重新激活圆木/斧头，造成"原木还在"）
     m_playerSide = side;   // 小人移动到该侧（站位决定撞死判定）
     m_lastInputBeat = m_currentBeat;   // 记录玩家最后一次真正输入
+    m_missStreak = 0;                  // 有动作就清空漏拍计数
     m_player.onSide(side); // 小人精灵切到对应一侧（本关自控站位）
     // 斧头始终跟随玩家所在侧（原版：砍就换侧；即使时机失误也瞬移，不留在原处）
     m_axeSpr.setPosition(side == Side::Left ? config::RHYTHM_AXE_LEFT_X : config::RHYTHM_AXE_RIGHT_X,
@@ -131,6 +133,7 @@ void BeatDriveLevel::handleInput(Side side) {
                                  config::RHYTHM_AXE_Y), perfect);
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
+        ++m_missStreak;                                    // 时机错也算一次 miss
         if (config::styleShowsMiss()) {
             m_timeRemaining -= config::MISS_TIME_PENALTY;
             setJudge("失误", "MISS", Color::Red);
@@ -160,17 +163,23 @@ void BeatDriveLevel::update(float dt) {
         checkCollision();      // 撞死会置 m_dead 并结算
         if (m_dead || m_cleared) return;   // 增加 m_cleared 检查
 
-        // 代打：开关打开 + 连续两拍没动手 → 先问一次，答应后才开始带打
-        const bool idle = (m_countdown < 0) && ((m_currentBeat - m_lastInputBeat) >= 2);
-        if (idle && config::g_autoAssist && !m_assistAsked && !m_assistOn) {
-            m_assistAsked = true;
-            m_game.requestAssist();
-            return;                       // 冻结本帧，等玩家回答
-        }
-        if (idle && m_assistOn) {
-            handleInput(m_letterSide);    // 字母提示的反侧就是正确答案
-            m_lastInputBeat = m_currentBeat;
-            if (m_dead || m_cleared) return;
+        // 漏拍统计（倒计时阶段不算）：这一拍之内没有动作，就算漏一拍
+        if (m_countdown < 0) {
+            if (m_lastInputBeat < m_currentBeat - 1) ++m_missStreak;
+            else                                     m_missStreak = 0;
+
+            // 连续漏拍（新手正在挫败）→ 问一次要不要带打
+            if (m_missStreak >= 3 && config::g_autoAssist && !m_assistAsked && !m_assistOn) {
+                m_assistAsked = true;
+                m_game.requestAssist();
+                return;                   // 冻结本帧，等玩家回答
+            }
+            // 已经答应代打：这一拍没动作就替玩家躲
+            if (m_assistOn && m_lastInputBeat < m_currentBeat) {
+                handleInput(m_letterSide);        // 字母提示的反侧就是正确答案
+                m_lastInputBeat = m_currentBeat;
+                if (m_dead || m_cleared) return;
+            }
         }
     }
 

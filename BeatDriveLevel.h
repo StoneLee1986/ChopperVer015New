@@ -111,6 +111,7 @@ private:
     int   m_lastInputBeat = -100;      // 上一次玩家输入的拍号（纯享受模式据此判断是否该代打）
     bool  m_assistAsked = false;       // 本局是否已经问过"要不要带你打"
     bool  m_assistOn    = false;       // 玩家是否已同意代打
+    int   m_missStreak  = 0;           // 连续漏拍数（漏一拍 = 这一拍内没做任何动作）
     RectangleShape m_hintBox;          // 提示框（右半边靠下）
     Clock m_judgeClock;                // 判定文字显示计时
 

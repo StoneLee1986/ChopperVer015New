@@ -63,6 +63,7 @@ void RhythmChopLevel::onStart() {
     m_beatClock   = 0.0f;   // 独立节拍时钟归零（与鼓声同步起跑）
     m_cleared = false; m_dead = false; m_ended = false;
     m_assistAsked = false; m_assistOn = false;   // 每局重新询问代打
+    m_missStreak  = 0;
     m_logActive = false;   // 圆木复位（隐藏）
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头开局隐藏（砍击时才出现）
@@ -75,6 +76,7 @@ void RhythmChopLevel::onStart() {
 void RhythmChopLevel::handleInput(Side side) {
     m_playerSide = side;   // 小人移动到该侧（站位决定撞死判定）
     m_lastInputBeat = m_currentBeat;   // 记录玩家最后一次真正输入（纯享受模式的代打判断用）
+    m_missStreak = 0;                  // 有动作就清空漏拍计数
     m_player.onSide(side); // 小人精灵切到对应一侧（本关自控站位）
     // 斧头始终跟随玩家所在侧（原版：砍就换侧；即使时机失误也瞬移，不留在原处）
     m_axeSpr.setPosition(side == Side::Left ? config::RHYTHM_AXE_LEFT_X : config::RHYTHM_AXE_RIGHT_X,
@@ -123,6 +125,7 @@ void RhythmChopLevel::handleInput(Side side) {
                                  config::RHYTHM_AXE_Y), perfect);
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
+        ++m_missStreak;                                    // 时机错也算一次 miss
         if (config::styleShowsMiss()) {
             m_timeRemaining -= config::MISS_TIME_PENALTY;
             setJudge("失误", "MISS", Color::Red);
@@ -150,14 +153,18 @@ void RhythmChopLevel::update(float dt)
         ++m_currentBeat;
         m_xPulse = 1.0f;   // 鼓声每响一次，X 放大缩小一次（提醒跟拍）
 
-        // 代打：开关打开 + 连续两拍没动手 → 先问一次，玩家答应后才开始带打
-        const bool idle = (m_currentBeat - m_lastInputBeat) >= 2;
-        if (idle && config::g_autoAssist && !m_assistAsked && !m_assistOn) {
+        // 漏拍统计：这一拍之内没有动作，就算漏一拍
+        if (m_lastInputBeat < m_currentBeat - 1) ++m_missStreak;
+        else                                     m_missStreak = 0;
+
+        // 连续漏拍（新手正在挫败）→ 问一次要不要带打
+        if (m_missStreak >= 3 && config::g_autoAssist && !m_assistAsked && !m_assistOn) {
             m_assistAsked = true;
             m_game.requestAssist();
             return;                       // 冻结本帧，等玩家回答
         }
-        if (idle && m_assistOn) {
+        // 已经答应代打：这一拍没动作就替玩家砍
+        if (m_assistOn && m_lastInputBeat < m_currentBeat) {
             handleInput(m_playerSide == Side::Left ? Side::Right : Side::Left);
             m_lastInputBeat = m_currentBeat;
             if (m_dead || m_cleared) return;

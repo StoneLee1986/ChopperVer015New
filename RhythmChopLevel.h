@@ -94,6 +94,7 @@ private:
     int   m_lastInputBeat = -100;      // 上一次玩家输入的拍号（纯享受模式据此判断是否该代打）
     bool  m_assistAsked = false;       // 本局是否已经问过"要不要带你打"
     bool  m_assistOn    = false;       // 玩家是否已同意代打
+    int   m_missStreak  = 0;           // 连续漏拍数（漏一拍 = 这一拍内没做任何动作）
     Text  m_judgeText, m_comboText;    // 判定文字 / 连击文字
     float m_judgeScale = 1.0f;         // 判定文字弹出缩放（1.0 = 正常）
     float m_comboScale = 1.0f;         // 连击文字弹跳缩放
