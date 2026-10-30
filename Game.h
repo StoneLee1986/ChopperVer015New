@@ -118,6 +118,12 @@ private:
     bool m_styleSelect    = false;   // 是否正在显示风格选择界面
     int  m_styleSelection = 1;       // 当前高亮项（0=纯享受 1=标准 2=挑战）
     bool m_tabHeld        = false;   // 主菜单 Tab 键边沿检测
+
+    // ---- "要不要带你打"提示（玩家一直不打拍子时出现） ----
+    bool m_assistOffer     = false;  // 是否正在显示提示（显示期间游戏冻结）
+    int  m_assistSelection = 1;      // 0=不用 1=好
+    void requestAssist();            // 关卡调用：请求弹出提示
+    void drawAssistPrompt();         // 画提示框
     void loadStyle();                // 读 playstyle.txt；没读过就进入选择界面
     void saveStyle();                // 写 playstyle.txt
     void drawStyleSelect();          // 画风格选择界面

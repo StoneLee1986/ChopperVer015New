@@ -41,6 +41,7 @@ public:
     void  pause()  override { m_drum.pause(); }
     void  resume() override { m_drum.play(); }
     void  stop()   override { m_drum.stop(); }
+    void  onAssistChosen(bool useAssist) override;   // "要不要带你打"的选择结果
 
     // ---- 概率接口：可挂难度（默认 左45/右45/无10） ----
     void setSpawnProb(float pLeft, float pRight) {
@@ -91,6 +92,8 @@ private:
     float m_xPulse = 0.0f;             // X 脉冲进度 0~1（perfect 瞬间置 1，随帧衰减）
     float m_treeShake = 0.0f;          // 树身抖动进度 0~1（砍中瞬间置 1，随帧衰减）
     int   m_lastInputBeat = -100;      // 上一次玩家输入的拍号（纯享受模式据此判断是否该代打）
+    bool  m_assistAsked = false;       // 本局是否已经问过"要不要带你打"
+    bool  m_assistOn    = false;       // 玩家是否已同意代打
     Text  m_judgeText, m_comboText;    // 判定文字 / 连击文字
     float m_judgeScale = 1.0f;         // 判定文字弹出缩放（1.0 = 正常）
     float m_comboScale = 1.0f;         // 连击文字弹跳缩放

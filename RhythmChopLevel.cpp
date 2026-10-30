@@ -62,6 +62,7 @@ void RhythmChopLevel::onStart() {
     m_currentBeat = 0;
     m_beatClock   = 0.0f;   // 独立节拍时钟归零（与鼓声同步起跑）
     m_cleared = false; m_dead = false; m_ended = false;
+    m_assistAsked = false; m_assistOn = false;   // 每局重新询问代打
     m_logActive = false;   // 圆木复位（隐藏）
     m_logSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);
     m_axeSpr.setPosition(config::BRANCH_OFFSCREEN, 0.0f);   // 斧头开局隐藏（砍击时才出现）
@@ -149,10 +150,16 @@ void RhythmChopLevel::update(float dt)
         ++m_currentBeat;
         m_xPulse = 1.0f;   // 鼓声每响一次，X 放大缩小一次（提醒跟拍）
 
-        // 纯享受模式：连续两拍没按过键，就替玩家砍一刀（像马里奥赛车的自动加速）
-        if (config::styleAutoAssist() && (m_currentBeat - m_lastInputBeat) >= 2) {
+        // 代打：开关打开 + 连续两拍没动手 → 先问一次，玩家答应后才开始带打
+        const bool idle = (m_currentBeat - m_lastInputBeat) >= 2;
+        if (idle && config::g_autoAssist && !m_assistAsked && !m_assistOn) {
+            m_assistAsked = true;
+            m_game.requestAssist();
+            return;                       // 冻结本帧，等玩家回答
+        }
+        if (idle && m_assistOn) {
             handleInput(m_playerSide == Side::Left ? Side::Right : Side::Left);
-            m_lastInputBeat = m_currentBeat;   // 代打不算玩家输入，但仍推进计时以免每拍都代打
+            m_lastInputBeat = m_currentBeat;
             if (m_dead || m_cleared) return;
         }
     }
@@ -255,6 +262,11 @@ void RhythmChopLevel::checkCollision() {
         m_player.die(m_playerSide);   // 压死视觉：小人移出屏幕、墓碑留在被压那一侧
         doGameOver(tr("你被压死了！", "SQUISHED!"), true);
     }
+}
+
+void RhythmChopLevel::onAssistChosen(bool useAssist) {
+    m_assistOn    = useAssist;
+    if (!useAssist) m_assistAsked = true;   // 拒绝后本局不再打扰
 }
 
 // 结束本局：只做本关特有的收尾（失败音、藏斧头/圆木），共用逻辑交给 Game::endRound

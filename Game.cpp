@@ -139,6 +139,7 @@ void Game::run() {
         // 分段计时：把一帧拆成"逻辑"和"渲染"两段，卡顿时能立刻判断是哪一段
         m_probeClock.restart();
         if (!m_paused && !m_escPaused && !m_inMenu && !m_inPauseMenu && !m_confirmExit
+            && !m_assistOffer
             && !m_scoreboard.isOpen() && !m_nameUI.isActive() && !m_settingsMenu.isOpen()) {  // 不在任何菜单/输入/确认、没暂停才更新
             update(dt);
         } else {
@@ -172,6 +173,28 @@ void Game::processEvents() {
             m_nameUI.appendChar(static_cast<wchar_t>(event.text.unicode));
     }
 
+    // ---- "要不要带你打"提示：显示期间冻结游戏，只响应左右+回车 ----
+    if (m_assistOffer) {
+        const bool l = Keyboard::isKeyPressed(Keyboard::Left);
+        const bool r = Keyboard::isKeyPressed(Keyboard::Right);
+        if ((l || r) && !m_menuInputHeld) {
+            m_menuInputHeld   = true;
+            m_assistSelection = 1 - m_assistSelection;
+        } else if (!l && !r) {
+            m_menuInputHeld = false;
+        }
+        const bool enter = Keyboard::isKeyPressed(Keyboard::Return);
+        if (enter && !m_enterHeld) {
+            m_enterHeld   = true;
+            m_assistOffer = false;
+            if (m_level) m_level->onAssistChosen(m_assistSelection == 1);
+            m_clock.restart();   // 解冻时别把冻结时间算进下一帧
+        } else if (!enter) {
+            m_enterHeld = false;
+        }
+        return;
+    }
+
     // ---- 玩法风格选择（首次启动必然经过；主菜单按 Tab 可重进） ----
     if (m_styleSelect) {
         const bool up   = Keyboard::isKeyPressed(Keyboard::Up);
@@ -186,6 +209,8 @@ void Game::processEvents() {
         if (enter && !m_enterHeld) {
             m_enterHeld      = true;
             config::g_style  = static_cast<config::PlayStyle>(m_styleSelection);
+            // 选"纯享受"时默认打开代打开关，其余风格默认关闭（之后可在设置里改）
+            config::g_autoAssist = (m_styleSelection == 0);
             saveStyle();
             m_styleSelect = false;
             m_inMenu      = false;
@@ -567,11 +592,60 @@ void Game::loadStyle() {
     if (v > 2) v = 2;
     config::g_style  = static_cast<config::PlayStyle>(v);
     m_styleSelection = v;
+    int assist = 0;
+    if (f >> assist) config::g_autoAssist = (assist != 0);
 }
 
 void Game::saveStyle() {
-    std::ofstream f("playstyle.txt");
-    if (f) f << static_cast<int>(config::g_style) << "\n";
+    config::savePlayStyle();
+}
+
+// 关卡发现玩家一直不打拍子 → 请求弹出"要不要带你打"提示
+void Game::requestAssist() {
+    if (m_assistOffer) return;
+    m_assistOffer     = true;
+    m_assistSelection = 1;      // 默认高亮"好"：都停手了，多半是跟不动
+    m_clock.restart();
+}
+
+void Game::drawAssistPrompt() {
+    RectangleShape panel(Vector2f(980.0f, 280.0f));
+    panel.setOrigin(490.0f, 140.0f);
+    panel.setPosition(config::SCREEN_CENTER_X, 520.0f);
+    panel.setFillColor(Color(18, 18, 26, 242));
+    panel.setOutlineThickness(3.0f);
+    panel.setOutlineColor(Color(120, 190, 255));
+    m_disp.window().draw(panel);
+
+    Text q;
+    q.setFont(m_font);
+    q.setCharacterSize(44);
+    q.setFillColor(Color::White);
+    q.setString(tr("还没跟上？要我带你一段吗？", "Not feeling the beat? Want me to play a bit?"));
+    centerText(q, config::SCREEN_CENTER_X, 450.0f);
+    m_disp.window().draw(q);
+
+    const char* opts[2][2] = {
+        { "不用，我自己来", "NO, I'LL TRY" },
+        { "好，带我一下",   "YES, HELP ME" }
+    };
+    for (int i = 0; i < 2; ++i) {
+        Text o;
+        o.setFont(m_font);
+        o.setCharacterSize(40);
+        o.setFillColor(i == m_assistSelection ? Color::Yellow : Color(190, 190, 190));
+        o.setString(tr(opts[i][0], opts[i][1]));
+        centerText(o, config::SCREEN_CENTER_X + (i == 0 ? -230.0f : 230.0f), 555.0f);
+        m_disp.window().draw(o);
+    }
+
+    Text hint;
+    hint.setFont(m_font);
+    hint.setCharacterSize(28);
+    hint.setFillColor(Color(150, 150, 150));
+    hint.setString(tr("←→ 选择      回车 确定", "LEFT/RIGHT choose, ENTER confirm"));
+    centerText(hint, config::SCREEN_CENTER_X, 620.0f);
+    m_disp.window().draw(hint);
 }
 
 void Game::drawStyleSelect() {
@@ -841,6 +915,7 @@ void Game::render() {
     if (m_paused || m_escPaused)
         m_disp.window().draw(m_messageText); // 暂停（含 Esc 手动暂停）时画中央提示
     m_fx.drawOverlay(m_disp.window());       // 闪光/鼓点脉冲/CRT：最上层
+    if (m_assistOffer) drawAssistPrompt();   // "要不要带你打"提示画在最前面
     if (m_disp.showFps()) m_disp.window().draw(m_fpsText);
     m_disp.window().display();
 }

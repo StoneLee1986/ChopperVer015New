@@ -40,6 +40,9 @@ public:
     virtual void pause()  = 0;
     virtual void resume() = 0;
     virtual void stop()   = 0;
+
+    // 玩家在"要不要带你打"提示里的选择（true = 接受代打）
+    virtual void onAssistChosen(bool useAssist) = 0;
 };
 
 #endif

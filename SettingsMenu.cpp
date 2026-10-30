@@ -1,4 +1,4 @@
-﻿// CHOPPER - SettingsMenu implementation
+// CHOPPER - SettingsMenu implementation
 #include "SettingsMenu.h"
 
 // ============================================================================
@@ -6,22 +6,22 @@
 // ============================================================================
 //  14 项设置标签的中英文对照（init 与 applyLanguage 共用；值文本另行处理）
 namespace {
-    const char* const ZH_LABELS[14] = {
+    const char* const ZH_LABELS[15] = {
         "音量", "音乐音量", "显示模式", "分辨率",
         "垂直同步", "帧率", "显示FPS",
         "难度", "手柄", "震动", "按键设置",
-        "语言", "恢复默认", "返回菜单"
+        "语言", "恢复默认", "自动代打", "返回菜单"
     };
-    const char* const EN_LABELS[14] = {
+    const char* const EN_LABELS[15] = {
         "SOUND VOLUME", "MUSIC VOLUME", "DISPLAY MODE", "RESOLUTION",
         "V-SYNC", "FRAME RATE", "SHOW FPS",
         "DIFFICULTY", "CONTROLLER", "VIBRATION", "KEYBINDINGS",
-        "LANGUAGE", "RESET TO DEFAULT", "BACK TO MENU"
+        "LANGUAGE", "RESET TO DEFAULT", "AUTO ASSIST", "BACK TO MENU"
     };
-    // 各项当前值的初始占位（2-6/11 是实时刷新项，其余保持占位显示）
-    const char* const SETTINGS_DEFAULT[14] = {
+    // 各项当前值的初始占位（2-6/11/13 是实时刷新项，其余保持占位显示）
+    const char* const SETTINGS_DEFAULT[15] = {
         "80", "80", "", "", "", "", "",
-        "--", "--", "--", "--", "--", "--", ""
+        "--", "--", "--", "--", "--", "--", "--", ""
     };
 }
 
@@ -37,7 +37,7 @@ void SettingsMenu::init(const Font& font) {
     alignRow(m_back, config::SCREEN_CENTER_X, 1030.0f, 0);
 
     // 布局：字号 38、行距 55、首项 y=200（正文上移，底部留白不贴边）
-    for (int i = 0; i < 14; ++i) {
+    for (int i = 0; i < 15; ++i) {
         const float y = 200.0f + i * 55.0f;
         m_options[i].setFont(font);
         m_options[i].setCharacterSize(38);
@@ -60,7 +60,7 @@ void SettingsMenu::applyLanguage() {
     m_back.setString(tr("上下: 选择    左右: 调整\n回车: 确认    ESC: 返回",
                         "UP/DOWN: SELECT    LEFT/RIGHT: CHANGE\nENTER: CONFIRM     ESC: BACK"));
     alignRow(m_back, config::SCREEN_CENTER_X, 1030.0f, 0);
-    for (int i = 0; i < 14; ++i) {
+    for (int i = 0; i < 15; ++i) {
         m_options[i].setString(tr(ZH_LABELS[i], EN_LABELS[i]));
         alignRow(m_options[i], 600.0f, 200.0f + i * 55.0f, 1);
     }
@@ -88,11 +88,11 @@ bool SettingsMenu::handleInput(bool up, bool down, bool left, bool right,
                                bool enter, bool escape) {
     refreshValues();  // 每帧刷新五项可调值的当前显示
 
-    // 上下选择（循环 0-13）
+    // 上下选择（循环 0-14）
     if ((up || down) && !m_inputHeld) {
         m_inputHeld = true;
-        if (up)   m_selection = (m_selection + 13) % 14; // 上移（-1 mod 14）
-        if (down) m_selection = (m_selection + 1) % 14;  // 下移
+        if (up)   m_selection = (m_selection + 14) % 15; // 上移（-1 mod 15）
+        if (down) m_selection = (m_selection + 1) % 15;  // 下移
     } else if (!up && !down) {
         m_inputHeld = false;
     }
@@ -105,13 +105,19 @@ bool SettingsMenu::handleInput(bool up, bool down, bool left, bool right,
         else if (m_selection == 5 && !m_fpsHeld)   { m_fpsHeld   = true; m_disp->cycleFramerate(); }
         else if (m_selection == 6 && !m_showFpsHeld) { m_showFpsHeld = true; m_disp->cycleShowFps(); }
         else if (m_selection == 11 && !m_langHeld) { m_langHeld = true; cycleLanguage(); }
+        else if (m_selection == 13 && !m_assistHeld) {
+            m_assistHeld = true;
+            config::g_autoAssist = !config::g_autoAssist;   // 自动代打开关
+            config::savePlayStyle();                        // 立即写盘
+        }
     } else {
         m_modeHeld = m_resHeld = m_vsyncHeld = m_fpsHeld = m_showFpsHeld = false;
         m_langHeld = false;
+        m_assistHeld = false;
     }
 
-    // 返回：Esc 随时可返回；BACK TO MENU(13) 项选中后按 Enter 也可返回（按来源回主/暂停菜单）
-    if (escape || (enter && m_selection == 13)) {
+    // 返回：Esc 随时可返回；BACK TO MENU(14) 项选中后按 Enter 也可返回（按来源回主/暂停菜单）
+    if (escape || (enter && m_selection == 14)) {
         if (!m_enterHeld) {
             m_enterHeld = true;
             m_active = false;   // 关闭设置界面（来源由 m_returnToPause 记录）
@@ -148,16 +154,18 @@ void SettingsMenu::refreshValues() {
     m_values[5].setString(fpsName);
     m_values[6].setString(m_disp->showFps() ? tr("开", "ON") : tr("关", "OFF"));
     m_values[11].setString(tr("中文", "English"));
+    m_values[13].setString(config::g_autoAssist ? tr("开", "ON") : tr("关", "OFF"));
     // 布局用 200 + idx*55
     for (int i = 2; i <= 6; ++i)
         alignRow(m_values[i], 1300.0f, 200.0f + i * 55.0f, 2);
     alignRow(m_values[11], 1300.0f, 200.0f + 11 * 55.0f, 2);
+    alignRow(m_values[13], 1300.0f, 200.0f + 13 * 55.0f, 2);
 }
 
 // 绘制界面
 void SettingsMenu::draw(RenderWindow& window) {
     window.draw(m_title);
-    for (int i = 0; i < 14; ++i) {
+    for (int i = 0; i < 15; ++i) {
         m_options[i].setFillColor(i == m_selection ? Color::Yellow : Color::White);
         window.draw(m_options[i]);
         window.draw(m_values[i]);

@@ -65,6 +65,13 @@ namespace config {
     // ==========================================================================
     enum class PlayStyle { Enjoy, Normal, Challenge };
     inline PlayStyle g_style = PlayStyle::Normal;   // 运行时当前风格
+    inline bool g_autoAssist = false;               // 自动代打总开关（设置界面可改；选纯享受时默认打开）
+
+    // 玩法存档：第 1 行风格，第 2 行代打开关
+    inline void savePlayStyle() {
+        std::ofstream f("playstyle.txt");
+        if (f) f << static_cast<int>(g_style) << "\n" << (g_autoAssist ? 1 : 0) << "\n";
+    }
 
     inline float goodWindow() {                      // 命中窗口（秒）
         switch (g_style) {

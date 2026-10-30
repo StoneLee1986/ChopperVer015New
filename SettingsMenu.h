@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 //  SettingsMenu 类：设置界面
 // ============================================================================
 //  负责设置界面的显示与交互：14 个设置项（上下选择、左右调值、Esc/Enter 返回），
@@ -34,9 +34,10 @@ private:
     bool m_inputHeld = false;                     // 上下键边沿
     bool m_enterHeld = false;                     // Enter/Esc 返回边沿
     bool m_modeHeld = false, m_resHeld = false, m_vsyncHeld = false,
-         m_fpsHeld = false, m_showFpsHeld = false, m_langHeld = false; // 左右改值边沿（防连跳）
+         m_fpsHeld = false, m_showFpsHeld = false, m_langHeld = false,
+         m_assistHeld = false; // 左右改值边沿（防连跳）
     Text m_title, m_back;                         // 标题 + 操作提示
-    Text m_options[14], m_values[14];             // 14 项：标签 + 右侧值
+    Text m_options[15], m_values[15];             // 15 项：标签 + 右侧值（14 = 返回菜单）
 };
 
 #endif
