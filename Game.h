@@ -114,6 +114,14 @@ private:
     // ---- 关卡模式（当前单一关卡：节奏鼓点；保留枚举与层级，未来加关卡再加值） ----
     config::GameMode m_mode = config::GameMode::ChopRhythm;  // 当前关卡
 
+    // ---- 玩法风格选择（首次启动强制选一次；主菜单按 Tab 可随时改） ----
+    bool m_styleSelect    = false;   // 是否正在显示风格选择界面
+    int  m_styleSelection = 1;       // 当前高亮项（0=纯享受 1=标准 2=挑战）
+    bool m_tabHeld        = false;   // 主菜单 Tab 键边沿检测
+    void loadStyle();                // 读 playstyle.txt；没读过就进入选择界面
+    void saveStyle();                // 写 playstyle.txt
+    void drawStyleSelect();          // 画风格选择界面
+
     // ---- UI 元素 ----
     RectangleShape m_timeBar;   // 红色时间条
     Text m_messageText, m_scoreText; // 中央提示文字 + 左上角分数

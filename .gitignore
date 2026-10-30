@@ -392,3 +392,7 @@ perf.log
 # Release 直接输出到根目录
 /*.exe
 
+
+# 玩法风格存档
+playstyle.txt
+

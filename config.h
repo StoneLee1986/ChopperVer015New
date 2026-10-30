@@ -59,6 +59,31 @@ namespace config {
     static const char* const FRAMERATE_NAMES[FRAMERATE_COUNT] = { "AUTO","60","120","144","240","UNLIMITED" };
     constexpr int   FPS_SHOW_DEFAULT = 1;    // 默认显示内置 FPS（验证高刷新率；游戏完成后再考虑去掉）
 
+    // ==========================================================================
+    //  玩法风格（首次启动时选择，之后可随时改）
+    //  设计意图：同一份谱面，三种人玩出三种体验——参数分档，不做三份谱。
+    // ==========================================================================
+    enum class PlayStyle { Enjoy, Normal, Challenge };
+    inline PlayStyle g_style = PlayStyle::Normal;   // 运行时当前风格
+
+    inline float goodWindow() {                      // 命中窗口（秒）
+        switch (g_style) {
+            case PlayStyle::Enjoy:     return 0.40f; // 跟着点头就能中
+            case PlayStyle::Challenge: return 0.12f;
+            default:                   return 0.25f;
+        }
+    }
+    inline float perfectWindow() {                   // 完美窗口（秒）
+        switch (g_style) {
+            case PlayStyle::Enjoy:     return 0.20f;
+            case PlayStyle::Challenge: return 0.06f;
+            default:                   return 0.12f;
+        }
+    }
+    inline bool styleCanDie()     { return g_style != PlayStyle::Enjoy; }  // 休闲模式不会死
+    inline bool styleShowsMiss()  { return g_style != PlayStyle::Enjoy; }  // 休闲模式不显示 MISS
+    inline bool styleAutoAssist() { return g_style == PlayStyle::Enjoy; }  // 两拍没输入就自动代打
+
     // ---- 特效强度（当前为「中等」档；轻 0.6 / 中 1.0 / 重 1.6） ----
     constexpr float FX_SHAKE_SCALE  = 1.0f;     // 屏幕震动倍率
     constexpr float FX_HITSTOP_SEC  = 0.045f;   // 命中定格（秒），0 = 关闭

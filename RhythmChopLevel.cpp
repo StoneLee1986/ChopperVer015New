@@ -73,6 +73,7 @@ void RhythmChopLevel::onStart() {
 // 砍树反馈(音效+圆木)每次砍都触发；节拍判定只驱动 X 放大(perfect)与时间条/得分(计分后做)。
 void RhythmChopLevel::handleInput(Side side) {
     m_playerSide = side;   // 小人移动到该侧（站位决定撞死判定）
+    m_lastInputBeat = m_currentBeat;   // 记录玩家最后一次真正输入（纯享受模式的代打判断用）
     m_player.onSide(side); // 小人精灵切到对应一侧（本关自控站位）
     // 斧头始终跟随玩家所在侧（原版：砍就换侧；即使时机失误也瞬移，不留在原处）
     m_axeSpr.setPosition(side == Side::Left ? config::RHYTHM_AXE_LEFT_X : config::RHYTHM_AXE_RIGHT_X,
@@ -102,8 +103,8 @@ void RhythmChopLevel::handleInput(Side side) {
     const float beat = 60.0f / config::RHYTHM_BPM;
     const float nearest = std::round(now / beat) * beat;   // 最近的鼓声拍
     const float diff    = std::fabs(now - nearest);
-    if (diff <= config::NOTE_GOOD_WINDOW) {                 // 在判定窗口内按＝命中
-        const bool perfect = diff <= config::NOTE_PERFECT_WINDOW;
+    if (diff <= config::goodWindow()) {                     // 在判定窗口内按＝命中
+        const bool perfect = diff <= config::perfectWindow();
         ++m_combo;
         m_comboScale = 1.5f;   // 连击数字弹一下
         if (m_combo > m_maxCombo) m_maxCombo = m_combo;
@@ -121,9 +122,14 @@ void RhythmChopLevel::handleInput(Side side) {
                                  config::RHYTHM_AXE_Y), perfect);
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
-        m_timeRemaining -= config::MISS_TIME_PENALTY;
-        setJudge("失误", "MISS", Color::Red);
-        m_game.m_fx.miss();                        // 特效：红闪 + 震屏
+        if (config::styleShowsMiss()) {
+            m_timeRemaining -= config::MISS_TIME_PENALTY;
+            setJudge("失误", "MISS", Color::Red);
+            m_game.m_fx.miss();                        // 特效：红闪 + 震屏
+        } else {
+            // 纯享受：不扣时间、不显示 MISS，只给一个温和的提示
+            setJudge("继续", "KEEP GOING", Color(180, 220, 255));
+        }
         m_letterText.setFillColor(Color::White);   // 失误 → X 回白
     }
 }
@@ -142,6 +148,13 @@ void RhythmChopLevel::update(float dt)
     {
         ++m_currentBeat;
         m_xPulse = 1.0f;   // 鼓声每响一次，X 放大缩小一次（提醒跟拍）
+
+        // 纯享受模式：连续两拍没按过键，就替玩家砍一刀（像马里奥赛车的自动加速）
+        if (config::styleAutoAssist() && (m_currentBeat - m_lastInputBeat) >= 2) {
+            handleInput(m_playerSide == Side::Left ? Side::Right : Side::Left);
+            m_lastInputBeat = m_currentBeat;   // 代打不算玩家输入，但仍推进计时以免每拍都代打
+            if (m_dead || m_cleared) return;
+        }
     }
 
     // 通关判定：走满谱面（或拍数）→ 必须显式结算，否则画面会静止卡住
@@ -179,8 +192,14 @@ void RhythmChopLevel::update(float dt)
     m_timeRemaining -= config::TIME_DECAY_PER_SEC * dt;
     if (m_timeRemaining < 0.0f) m_timeRemaining = 0.0f;
     if (m_timeRemaining <= 0.0f) {
-        doGameOver(tr("时间到！！", "Out of time!!"), true);
-        return;
+        if (!config::styleCanDie()) {
+            // 纯享受：时间到也不结束，回半管继续玩
+            m_timeRemaining = config::START_TIME * 0.5f;
+            setJudge("缓一下", "RELAX", Color(180, 220, 255));
+        } else {
+            doGameOver(tr("时间到！！", "Out of time!!"), true);
+            return;
+        }
     }
 
     // 判定/连击文字回弹（弹出时 >1，逐帧衰减回 1.0）
@@ -223,6 +242,15 @@ void RhythmChopLevel::advanceBranches() {
 void RhythmChopLevel::checkCollision() {
     const Side bottom = m_branches[config::RHYTHM_BRANCH_COUNT - 1];
     if (bottom != Side::None && bottom == m_playerSide) {
+        if (!config::styleCanDie()) {
+            // 纯享受：不会死。改成掉分 + 视觉反馈，树枝消失，继续玩
+            m_score = std::max(0, m_score - 100);
+            m_combo = 0;
+            m_branches[config::RHYTHM_BRANCH_COUNT - 1] = Side::None;
+            setJudge("被撞了一下", "BUMPED", Color(255, 200, 120));
+            m_game.m_fx.miss();
+            return;
+        }
         m_dead = true;
         m_player.die(m_playerSide);   // 压死视觉：小人移出屏幕、墓碑留在被压那一侧
         doGameOver(tr("你被压死了！", "SQUISHED!"), true);
@@ -252,10 +280,13 @@ void RhythmChopLevel::renderScene(sf::RenderWindow& w) {
     // 砍中时树身抖一下（左右 3px，0.15 秒衰减），比整屏震动更像"砍在树上"
     {
         const Vector2f base = m_tree.getPosition();
-        if (m_treeShake > 0.0f) {
-            const float dx = std::sin(m_treeShake * 40.0f) * 3.0f * m_treeShake;
-            m_tree.setPosition(base.x + dx, base.y);
-        }
+        float dx = 0.0f;
+        if (m_treeShake > 0.0f)
+            dx = std::sin(m_treeShake * 40.0f) * 3.0f * m_treeShake;
+        // 律动：树随每一拍轻微起伏，让画面"在呼吸"
+        const float beatSec = 60.0f / config::RHYTHM_BPM;
+        const float dy = std::sin(6.2831853f * m_beatClock / beatSec) * 3.0f;
+        m_tree.setPosition(base.x + dx, base.y + dy);
         w.draw(m_tree);        // 树（静态完整树，本关自持）
         m_tree.setPosition(base);
     }

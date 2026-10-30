@@ -54,6 +54,7 @@ Game::Game()
     }
     setupMenu(MenuKind::Main);   // 开局显示主菜单
     switchBgm(BgmState::Menu);   // 主菜单 BGM：一进游戏就有音乐
+    loadStyle();                 // 首次启动 → 直接进入风格选择界面
 
     // ---- 退出二次确认界面 ----
     m_confirmTitle.setFont(m_font);
@@ -169,6 +170,30 @@ void Game::processEvents() {
         // 名字输入界面：直接敲键盘字母/数字即可追加（手柄玩家则用下方网格）
         if (event.type == Event::TextEntered && m_nameUI.isActive())
             m_nameUI.appendChar(static_cast<wchar_t>(event.text.unicode));
+    }
+
+    // ---- 玩法风格选择（首次启动必然经过；主菜单按 Tab 可重进） ----
+    if (m_styleSelect) {
+        const bool up   = Keyboard::isKeyPressed(Keyboard::Up);
+        const bool down = Keyboard::isKeyPressed(Keyboard::Down);
+        if ((up || down) && !m_menuInputHeld) {
+            m_menuInputHeld  = true;
+            m_styleSelection = (m_styleSelection + (up ? 2 : 1)) % 3;
+        } else if (!up && !down) {
+            m_menuInputHeld = false;
+        }
+        const bool enter = Keyboard::isKeyPressed(Keyboard::Return);
+        if (enter && !m_enterHeld) {
+            m_enterHeld      = true;
+            config::g_style  = static_cast<config::PlayStyle>(m_styleSelection);
+            saveStyle();
+            m_styleSelect = false;
+            m_inMenu      = false;
+            enterStage(config::GameMode::ChopRhythm);   // 选完直接进第一关，不经过主菜单
+        } else if (!enter) {
+            m_enterHeld = false;
+        }
+        return;
     }
 
     // ---- 名字输入界面：交给 NameEntryUI，只编排提交后的收尾 ----
@@ -374,6 +399,17 @@ void Game::processEvents() {
 
     // 菜单（主/暂停共用）：上下方向键切换选中项（边沿检测，避免按住快速跳动）
     if (m_inMenu || m_inPauseMenu) {
+        // 主菜单按 Tab：重新选择玩法风格（随时可改，不用删存档）
+        if (m_inMenu && !m_inStageSelect) {
+            const bool tab = Keyboard::isKeyPressed(Keyboard::Tab);
+            if (tab && !m_tabHeld) {
+                m_tabHeld        = true;
+                m_styleSelect    = true;
+                m_styleSelection = static_cast<int>(config::g_style);
+            } else if (!tab) {
+                m_tabHeld = false;
+            }
+        }
         const bool up   = Keyboard::isKeyPressed(Keyboard::Up);
         const bool down = Keyboard::isKeyPressed(Keyboard::Down);
         if ((up || down) && !m_menuInputHeld) {
@@ -513,6 +549,63 @@ void Game::returnToMainMenu() {
     m_paused        = true;   // 主菜单阶段不推进游戏
     if (m_currentBgm != BgmState::Menu) switchBgm(BgmState::Menu);
     setupMenu(MenuKind::Main);   // 重填主菜单文字并复位选中项
+}
+
+// ============================================================================
+//  玩法风格（首次启动选一次，之后主菜单按 Tab 可改）
+// ============================================================================
+void Game::loadStyle() {
+    std::ifstream f("playstyle.txt");
+    if (!f) {                        // 第一次启动：先选风格，选完直接进第一关
+        m_styleSelect    = true;
+        m_styleSelection = 1;        // 默认高亮"标准"
+        return;
+    }
+    int v = 1;
+    f >> v;
+    if (v < 0) v = 0;
+    if (v > 2) v = 2;
+    config::g_style  = static_cast<config::PlayStyle>(v);
+    m_styleSelection = v;
+}
+
+void Game::saveStyle() {
+    std::ofstream f("playstyle.txt");
+    if (f) f << static_cast<int>(config::g_style) << "\n";
+}
+
+void Game::drawStyleSelect() {
+    // 用局部 Text，避免污染主菜单共用的那批文字对象
+    Text title;
+    title.setFont(m_font);
+    title.setString(tr("选择你的玩法", "CHOOSE YOUR STYLE"));
+    title.setCharacterSize(90);
+    title.setFillColor(Color::White);
+    centerText(title, config::SCREEN_CENTER_X, 250.0f);
+    m_disp.window().draw(title);
+
+    const char* names[3][2] = {
+        { "纯享受 · 不会失败，跟着点头就好", "RELAX - never lose, just feel the beat" },
+        { "标准 · 会失败，但判定很宽容",     "NORMAL - you can lose, forgiving timing" },
+        { "挑战 · 判定严格，给想刷分的人",   "CHALLENGE - strict timing, for high scores" },
+    };
+    for (int i = 0; i < 3; ++i) {
+        Text opt;
+        opt.setFont(m_font);
+        opt.setString(tr(names[i][0], names[i][1]));
+        opt.setCharacterSize(46);
+        opt.setFillColor(i == m_styleSelection ? Color::Yellow : Color::White);
+        centerText(opt, config::SCREEN_CENTER_X, 470.0f + 95.0f * static_cast<float>(i));
+        m_disp.window().draw(opt);
+    }
+
+    Text hint;
+    hint.setFont(m_font);
+    hint.setString(tr("↑↓ 选择      回车 开始", "UP/DOWN choose      ENTER start"));
+    hint.setCharacterSize(34);
+    hint.setFillColor(Color(170, 170, 170));
+    centerText(hint, config::SCREEN_CENTER_X, 900.0f);
+    m_disp.window().draw(hint);
 }
 
 // 统一"结束本局"入口：两个关卡的 doGameOver 都只做本关特有的收尾
@@ -669,6 +762,13 @@ void Game::render() {
             m_upMax     = 0.0f;
             m_rndMax    = 0.0f;
         }
+    }
+    if (m_styleSelect) {
+        // ---- 玩法风格选择：启动后第一屏，选完直接进关 ----
+        drawStyleSelect();
+        if (m_disp.showFps()) m_disp.window().draw(m_fpsText);
+        m_disp.window().display();
+        return;
     }
     if (m_nameUI.isActive()) {
         // ---- 名字输入界面：黑底 + 标题 + 名字预览 + 字母网格 + SKIP/DONE ----

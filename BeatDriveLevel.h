@@ -107,6 +107,7 @@ private:
     Text  m_judgeText, m_comboText;    // 判定文字 / 连击文字
     float m_judgeScale = 1.0f;         // 判定文字弹出缩放（1.0 = 正常）
     float m_comboScale = 1.0f;         // 连击文字弹跳缩放
+    int   m_lastInputBeat = -100;      // 上一次玩家输入的拍号（纯享受模式据此判断是否该代打）
     RectangleShape m_hintBox;          // 提示框（右半边靠下）
     Clock m_judgeClock;                // 判定文字显示计时
 
