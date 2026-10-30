@@ -112,6 +112,12 @@ private:
     bool  m_assistAsked = false;       // 本局是否已经问过"要不要带你打"
     bool  m_assistOn    = false;       // 玩家是否已同意代打
     int   m_missStreak  = 0;           // 连续漏拍数（漏一拍 = 这一拍内没做任何动作）
+
+    // 被打中的蜗牛变成壳往下沉（纯表现，不参与判定）
+    struct ShellFx { Vector2f pos; float vy = 0.0f; float life = 0.0f; bool on = false; };
+    ShellFx m_shells[8];
+    int     m_shellCursor = 0;
+    void    spawnShell(Vector2f pos);
     RectangleShape m_hintBox;          // 提示框（右半边靠下）
     Clock m_judgeClock;                // 判定文字显示计时
 

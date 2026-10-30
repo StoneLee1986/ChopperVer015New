@@ -123,6 +123,9 @@ void RhythmChopLevel::handleInput(Side side) {
         m_game.m_fx.hit(Vector2f(side == Side::Left ? config::RHYTHM_AXE_LEFT_X
                                                     : config::RHYTHM_AXE_RIGHT_X,
                                  config::RHYTHM_AXE_Y), perfect);
+        // 被打中的蜗牛变成壳，往下沉
+        spawnShell(Vector2f(side == Side::Left ? config::NOTE_LEFT_X : config::NOTE_RIGHT_X,
+                            config::RHYTHM_BRANCH_SPACING * (config::RHYTHM_BRANCH_COUNT - 1.0f)));
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
         ++m_missStreak;                                    // 时机错也算一次 miss
@@ -202,6 +205,15 @@ void RhythmChopLevel::update(float dt)
     // 背景装饰推进：云 + 蜜蜂漂移（本关自持场景元素）
     m_scenery.update(sf::seconds(dt));
 
+    // 壳下沉
+    for (int i = 0; i < 8; ++i) {
+        ShellFx& sh = m_shells[i];
+        if (!sh.on) continue;
+        sh.pos.y += sh.vy * dt;
+        sh.life  -= dt;
+        if (sh.life <= 0.0f) sh.on = false;
+    }
+
     // 时间条自然衰减
     m_timeRemaining -= config::TIME_DECAY_PER_SEC * dt;
     if (m_timeRemaining < 0.0f) m_timeRemaining = 0.0f;
@@ -276,6 +288,16 @@ void RhythmChopLevel::onAssistChosen(bool useAssist) {
     if (!useAssist) m_assistAsked = true;   // 拒绝后本局不再打扰
 }
 
+// 被打中的蜗牛变成壳往下沉（纯表现）
+void RhythmChopLevel::spawnShell(Vector2f pos) {
+    ShellFx& sh = m_shells[m_shellCursor];
+    m_shellCursor = (m_shellCursor + 1) % 8;
+    sh.pos = pos;
+    sh.vy = 300.0f;
+    sh.life = 1.2f;
+    sh.on = true;
+}
+
 // 结束本局：只做本关特有的收尾（失败音、藏斧头/圆木），共用逻辑交给 Game::endRound
 void RhythmChopLevel::doGameOver(const sf::String& msg, bool playFailSound) {
     if (m_ended) return;   // 互斥：压死/超时/通关只执行最先触发的那一种
@@ -302,31 +324,32 @@ void RhythmChopLevel::renderScene(sf::RenderWindow& w) {
         float dx = 0.0f;
         if (m_treeShake > 0.0f)
             dx = std::sin(m_treeShake * 40.0f) * 3.0f * m_treeShake;
-        // 律动：树随每一拍轻微起伏，让画面"在呼吸"
-        const float beatSec = 60.0f / config::RHYTHM_BPM;
-        const float dy = std::sin(6.2831853f * m_beatClock / beatSec) * 3.0f;
-        // 中央石柱：多块石头叠成（单张 128px 拉伸会变形）
-        static const float kRockDx[config::ROCK_COUNT] = { 0.0f, 16.0f, -12.0f, 20.0f, -6.0f };
-        for (int r = 0; r < config::ROCK_COUNT; ++r) {
-            Sprite rock(m_game.m_texTree);
-            rock.setOrigin(64.0f, 128.0f);                      // 底部中心
-            rock.setScale(config::ROCK_SCALE, config::ROCK_SCALE);
-            rock.setPosition(base.x + dx + kRockDx[r],
-                             base.y + dy - static_cast<float>(r) * config::ROCK_STEP_Y);
-            w.draw(rock);
-        }
-        m_tree.setPosition(base);
+        // 中央石制隔离层是静态的，已经烘焙进 bg.png，这里不再绘制
+        (void)base; (void)dx;
     }
 
-    // 下落中的树枝（长在树上，画在树前）
+    // 下落的蜗牛（原来"树枝"的槽位）
     for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {
         if (m_branches[i] == Side::None) continue;
-        Sprite branch(m_game.m_texBranch);
-        branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
-        branch.setScale(config::BRANCH_ART_SCALE, config::BRANCH_ART_SCALE);
-        const float y = i * config::RHYTHM_BRANCH_SPACING;
-        branch.setPosition(m_branches[i] == Side::Left ? config::NOTE_LEFT_X : config::NOTE_RIGHT_X, y);
-        w.draw(branch);
+        const bool frameB = (static_cast<int>(m_beatClock * 4.0f) % 2) == 1;
+        Sprite snail(frameB ? m_game.m_texSnailB : m_game.m_texSnailA);
+        snail.setOrigin(32.0f, 64.0f);
+        snail.setScale(2.0f, 2.0f);
+        const float y = i * config::RHYTHM_BRANCH_SPACING + 64.0f;
+        snail.setPosition(m_branches[i] == Side::Left ? config::NOTE_LEFT_X : config::NOTE_RIGHT_X, y);
+        w.draw(snail);
+    }
+
+    // 被打中后下沉的壳
+    for (int i = 0; i < 8; ++i) {
+        const ShellFx& sh = m_shells[i];
+        if (!sh.on) continue;
+        Sprite shell(m_game.m_texShell);
+        shell.setOrigin(32.0f, 64.0f);
+        shell.setScale(2.0f, 2.0f);
+        shell.setPosition(sh.pos);
+        shell.setColor(Color(255, 255, 255, static_cast<Uint8>(std::min(1.0f, sh.life) * 255.0f)));
+        w.draw(shell);
     }
 
     if (m_logActive) w.draw(m_logSpr);   // 单块圆木水平飞出（原版砍树反馈）

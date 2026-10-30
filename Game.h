@@ -91,6 +91,7 @@ private:
     Texture m_texBackground, m_texTree, m_texBee, m_texCloud;
     Texture m_texBranch, m_texPlayer, m_texRip;
     Texture m_texAxe, m_texLog;   // 斧头 / 圆木（砍树动画）
+    Texture m_texSnailA, m_texSnailB, m_texShell;   // 蜗牛两帧 + 被打后的壳
     Font m_font;   // 字体
 
     // ---- 音效 ----

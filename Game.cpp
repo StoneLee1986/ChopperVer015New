@@ -962,6 +962,9 @@ void Game::loadAssets() {
     loadTexture(m_texRip,        config::ASSET_RIP,        "rip");
     loadTexture(m_texAxe,        config::ASSET_AXE,        "axe");
     loadTexture(m_texLog,        config::ASSET_LOG,        "log");
+    loadTexture(m_texSnailA,     config::ASSET_SNAIL_A,    "snail_a");
+    loadTexture(m_texSnailB,     config::ASSET_SNAIL_B,    "snail_b");
+    loadTexture(m_texShell,      config::ASSET_SHELL,      "shell");
     // 加载字体
     if (!m_font.loadFromFile(config::ASSET_FONT))
         std::cerr << "[Warning] 字体加载失败: " << config::ASSET_FONT << "\n";

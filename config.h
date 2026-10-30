@@ -170,8 +170,8 @@ namespace config {
     constexpr float  RHYTHM_AXE_RIGHT_X = 1075.0f;  // 斧头在右侧位置 X（原版）
     constexpr float  RHYTHM_AXE_Y       = 830.0f;   // 斧头 Y（原版，贴近树底）
     constexpr float  RHYTHM_LOG_Y       = 720.0f;   // 圆木起点 Y（原版，树中部）
-    constexpr float  RHYTHM_LOG_VX      = 5000.0f;  // 圆木水平飞出速度（原版极速，飞出干脆）
-    constexpr float  RHYTHM_LOG_VY      = -1500.0f; // 圆木垂直初速（原版向上，负号=屏幕上方）
+    constexpr float  RHYTHM_LOG_VX      = 1800.0f;  // 泡泡水平飞出速度（气泡该慢慢飘，不能像圆木那样射出去）
+    constexpr float  RHYTHM_LOG_VY      = -320.0f;  // 泡泡垂直初速（略微上飘）
     constexpr float  RHYTHM_LOG_SCALE   = 0.6f;     // 圆木显示缩放（0.35 太小放大到约 180x72，醒目但不过大）
     constexpr float  RHYTHM_BRANCH_GROW_PER_SLOT = 1.04f; // 树枝每靠近玩家一槽放大倍数(+4%)，越近越大营造压迫感
 
@@ -205,6 +205,10 @@ namespace config {
     constexpr const char* ASSET_LOG        = "graphics/fish/bubble2.png";  // 气泡（原圆木）
     constexpr const char* ASSET_FONT       = "fonts/AlibabaPuHuiTi-3-55-Regular.ttf";     // 字体（阿里巴巴普惠体 3.0 Regular，免费商用，支持中文）
     constexpr const char* ASSET_CHOP_SOUND     = "sound/chop.wav";       // 砍树音效
+    // 敌人与反馈（海底关：蜗牛 + 被打后沉下去的壳）
+    constexpr const char* ASSET_SNAIL_A    = "graphics/fish/snail_a.png";
+    constexpr const char* ASSET_SNAIL_B    = "graphics/fish/snail_b.png";
+    constexpr const char* ASSET_SHELL      = "graphics/fish/shell.png";
 
     // ---- 最高分 ----
     constexpr int    HIGHSCORE_MAX = 20;      // 榜单最多 20 名

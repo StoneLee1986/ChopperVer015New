@@ -131,6 +131,9 @@ void BeatDriveLevel::handleInput(Side side) {
         m_game.m_fx.hit(Vector2f(side == Side::Left ? config::RHYTHM_AXE_LEFT_X
                                                     : config::RHYTHM_AXE_RIGHT_X,
                                  config::RHYTHM_AXE_Y), perfect);
+        // 被打中的蜗牛变成壳，往下沉
+        spawnShell(Vector2f(side == Side::Left ? config::NOTE_LEFT_X : config::NOTE_RIGHT_X,
+                            config::RHYTHM_BRANCH_SPACING * (config::RHYTHM_BRANCH_COUNT - 1.0f)));
     } else {                                               // 远离鼓声拍＝时机失误
         m_combo = 0;
         ++m_missStreak;                                    // 时机错也算一次 miss
@@ -206,6 +209,15 @@ void BeatDriveLevel::update(float dt) {
 
     // 背景装饰推进：云 + 蜜蜂漂移（本关自持场景元素）
     m_scenery.update(sf::seconds(dt));
+
+    // 壳下沉
+    for (int i = 0; i < 8; ++i) {
+        ShellFx& sh = m_shells[i];
+        if (!sh.on) continue;
+        sh.pos.y += sh.vy * dt;
+        sh.life  -= dt;
+        if (sh.life <= 0.0f) sh.on = false;
+    }
 
     // 时间条：倒计时阶段（m_countdown >= 0）玩家还没开始砍，不衰减也不判负
     if (m_countdown < 0) {
@@ -295,6 +307,16 @@ void BeatDriveLevel::onAssistChosen(bool useAssist) {
     if (!useAssist) m_assistAsked = true;   // 拒绝后本局不再打扰
 }
 
+// 被打中的蜗牛变成壳往下沉（纯表现）
+void BeatDriveLevel::spawnShell(Vector2f pos) {
+    ShellFx& sh = m_shells[m_shellCursor];
+    m_shellCursor = (m_shellCursor + 1) % 8;
+    sh.pos = pos;
+    sh.vy = 300.0f;
+    sh.life = 1.2f;
+    sh.on = true;
+}
+
 // 结束本局：只做本关特有的收尾（失败音、小人倒下、清残留），共用逻辑交给 Game::endRound
 void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
     if (m_ended) return;              // 结算互斥：三种结局只执行最先触发的那一种
@@ -319,56 +341,40 @@ void BeatDriveLevel::doGameOver(const sf::String& msg, bool playFailSound) {
 // 画本关全部场景（背景/云/蜜蜂 → 树 → 树枝 → 小人/墓碑 → 圆木 → 斧头）
 void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
     m_scenery.render(w);   // 背景 + 云 + 蜜蜂（最底层）
-    // 律动：树随每一拍轻微起伏（幅度小，但整屏都在动，节奏感来自这里）
-    {
-        const Vector2f base = m_tree.getPosition();
-        const float beatSec = 60.0f / config::RHYTHM_BPM;
-        const float bob = std::sin(6.2831853f * m_beatClock / beatSec) * 3.0f;
-        static const float kRockDx[config::ROCK_COUNT] = { 0.0f, 16.0f, -12.0f, 20.0f, -6.0f };
-        for (int r = 0; r < config::ROCK_COUNT; ++r) {
-            Sprite rock(m_game.m_texTree);
-            rock.setOrigin(64.0f, 128.0f);
-            rock.setScale(config::ROCK_SCALE, config::ROCK_SCALE);
-            rock.setPosition(base.x + kRockDx[r], base.y + bob - static_cast<float>(r) * config::ROCK_STEP_Y);
-            w.draw(rock);
-        }
-        m_tree.setPosition(base);
-    }
+    // 中央石制隔离层是静态的，已经烘焙进 bg.png，这里不再绘制
 
-    // 下落中的树枝（长在树上，画在树前）
-    const int pending = config::RHYTHM_BRANCH_COUNT - 2;   // 字母对应的树枝 = 即将压到玩家的槽位(index4)
+    // 下落的蜗牛（原来"树枝"的槽位）
+    const int pending = config::RHYTHM_BRANCH_COUNT - 2;   // 字母对应的蜗牛 = 即将压到玩家的槽位(index4)
     for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {
         if (m_branches[i].side == Side::None) continue;
-        Sprite branch(m_game.m_texBranch);
-        branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
-        // 越靠近玩家一槽，海草放大 +4%（scale 在 advanceBranches 下移时累积）
-        const float scale = m_branches[i].scale * config::BRANCH_ART_SCALE;
-        branch.setScale(scale, scale);
-        // 加 RHYTHM_BRANCH_Y_OFFSET：让压死层(最底槽)贴近玩家头顶
-        const float y = i * config::RHYTHM_BRANCH_SPACING + config::RHYTHM_BRANCH_Y_OFFSET;
-        branch.setPosition(m_branches[i].side == Side::Left ? config::NOTE_LEFT_X
-                                                            : config::NOTE_RIGHT_X, y);
-        w.draw(branch);
+        const bool frameB = (static_cast<int>(m_beatClock * 4.0f) % 2) == 1;
+        Sprite snail(frameB ? m_game.m_texSnailB : m_game.m_texSnailA);
+        snail.setOrigin(32.0f, 64.0f);
+        const float scale = 2.0f * m_branches[i].scale;   // 越靠近玩家越大
+        snail.setScale(scale, scale);
+        const float y = i * config::RHYTHM_BRANCH_SPACING + config::RHYTHM_BRANCH_Y_OFFSET + 64.0f;
+        snail.setPosition(m_branches[i].side == Side::Left ? config::NOTE_LEFT_X
+                                                           : config::NOTE_RIGHT_X, y);
+        w.draw(snail);
 
-        // 拖影：向上两层半透明残影，制造"正在往下砸"的速度感（每拍跳一格，靠残影补出运动）
+        // 拖影：向上两层半透明残影，制造"正在往下砸"的速度感
         for (int g = 1; g <= 2; ++g) {
-            Sprite ghost = branch;
+            Sprite ghost = snail;
             ghost.move(0.0f, -16.0f * static_cast<float>(g));
             ghost.setColor(Color(255, 255, 255, static_cast<Uint8>(64 / g)));
             w.draw(ghost);
         }
 
-        // 校对红框：框住字母对应的那根树枝(index4)，粗红框，明暗节奏与字母完全同步（同相位闪烁）
+        // 校对红框：框住字母对应的那只蜗牛(index4)，粗红框，明暗节奏与字母完全同步（同相位闪烁）
         if (i == pending && m_letterActive) {
-            const sf::Vector2u tsz = m_game.m_texBranch.getSize();
+            const sf::Vector2u tsz = m_game.m_texSnailA.getSize();
             const float margin = 12.0f;
-            // 红框尺寸与树枝缩放同步放大（边距也随缩放等比例）
             const float scaledMargin = margin * scale;
             RectangleShape box(Vector2f(tsz.x * scale + 2.0f * scaledMargin,
                                         tsz.y * scale + 2.0f * scaledMargin));
-            // 原点(中心)固定，缩放后红框半宽 = (BRANCH_ORIGIN + margin) × scale
-            box.setPosition(branch.getPosition().x - (config::BRANCH_ORIGIN_X + margin) * scale,
-                            branch.getPosition().y - (config::BRANCH_ORIGIN_Y + margin) * scale);
+            // 锚点在底部中心（32,64）
+            box.setPosition(snail.getPosition().x - (32.0f + margin) * scale,
+                            snail.getPosition().y - (64.0f + margin) * scale);
             box.setFillColor(Color::Transparent);
             box.setOutlineThickness(6.0f);   // 粗框，防不明显
             // 与字母相同的淡入/保持/淡出相位 → 与字母同频率闪烁
@@ -379,6 +385,18 @@ void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
             box.setOutlineColor(Color(255, 0, 0, static_cast<sf::Uint8>(a)));
             w.draw(box);
         }
+    }
+
+    // 被打中后下沉的壳
+    for (int i = 0; i < 8; ++i) {
+        const ShellFx& sh = m_shells[i];
+        if (!sh.on) continue;
+        Sprite shell(m_game.m_texShell);
+        shell.setOrigin(32.0f, 64.0f);
+        shell.setScale(2.0f, 2.0f);
+        shell.setPosition(sh.pos);
+        shell.setColor(Color(255, 255, 255, static_cast<Uint8>(std::min(1.0f, sh.life) * 255.0f)));
+        w.draw(shell);
     }
 
     if (m_logActive) w.draw(m_logSpr);   // 单块圆木水平飞出（原版砍树反馈）
