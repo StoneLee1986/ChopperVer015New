@@ -412,6 +412,9 @@ void Game::startNewGame(config::GameMode mode) {
     m_escPaused = false; // 清掉可能的 Esc 暂停标记（重开一局时恢复为运行态）
     m_escHeld   = false; // 同时清掉 Esc 边沿检测标志
     m_acceptInput = true; // 可以开始按方向键了
+    m_lastTimeRemaining = -1.0f;   // 时间条反馈复位（避免新一局开头误判成"回血"）
+    m_timeFlash = 0.0f;
+    m_timeBar.setFillColor(Color::Red);
     if (mode == config::GameMode::ChopRhythm)
         switchBgm(BgmState::LevelA);
     else if (mode == config::GameMode::BeatDrive)
@@ -609,6 +612,23 @@ void Game::update(const Time& dt) {
     if (sc != m_lastScoreShown) {
         m_lastScoreShown = sc;
         m_scoreText.setString(tr("得分 = ", "Score = ") + std::to_string(sc));
+    }
+
+    // 时间条反馈：回血瞬间变绿、失误瞬间变亮红，0.25 秒后恢复常态
+    const float tr = m_level->timeRemaining();
+    if (m_lastTimeRemaining >= 0.0f) {
+        if (tr > m_lastTimeRemaining + 0.15f) {
+            m_timeBar.setFillColor(Color(110, 255, 130));
+            m_timeFlash = 0.25f;
+        } else if (tr < m_lastTimeRemaining - 0.30f) {
+            m_timeBar.setFillColor(Color(255, 70, 70));
+            m_timeFlash = 0.25f;
+        }
+    }
+    m_lastTimeRemaining = tr;
+    if (m_timeFlash > 0.0f) {
+        m_timeFlash -= realDt;
+        if (m_timeFlash <= 0.0f) m_timeBar.setFillColor(Color::Red);
     }
 }
 

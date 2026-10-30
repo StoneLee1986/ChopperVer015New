@@ -84,6 +84,8 @@ private:
     float m_rndMax    = 0.0f;   // 窗口内最差渲染帧
     Clock m_probeClock;         // 分段计时用
     int   m_lastScoreShown = -1; // 已显示过的分数，避免每帧重排文字
+    float m_lastTimeRemaining = -1.0f; // 上一帧剩余时间（用于时间条回血/扣血反馈）
+    float m_timeFlash = 0.0f;          // 时间条高亮剩余时间（秒）
 
     // ---- 纹理（图片数据，一份就行，多个精灵共用；元素精灵放关卡内） ----
     Texture m_texBackground, m_texTree, m_texBee, m_texCloud;

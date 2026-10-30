@@ -104,6 +104,7 @@ void RhythmChopLevel::handleInput(Side side) {
     if (diff <= config::NOTE_GOOD_WINDOW) {                 // 在判定窗口内按＝命中
         const bool perfect = diff <= config::NOTE_PERFECT_WINDOW;
         ++m_combo;
+        m_comboScale = 1.5f;   // 连击数字弹一下
         if (m_combo > m_maxCombo) m_maxCombo = m_combo;
         m_score += perfect ? 100 : 50;
         m_timeRemaining = std::min(config::START_TIME, m_timeRemaining +
@@ -175,6 +176,12 @@ void RhythmChopLevel::update(float dt)
         doGameOver(tr("时间到！！", "Out of time!!"), true);
         return;
     }
+
+    // 判定/连击文字回弹（弹出时 >1，逐帧衰减回 1.0）
+    if (m_judgeScale > 1.0f) { m_judgeScale -= dt * 4.5f; if (m_judgeScale < 1.0f) m_judgeScale = 1.0f; }
+    if (m_comboScale > 1.0f) { m_comboScale -= dt * 5.0f; if (m_comboScale < 1.0f) m_comboScale = 1.0f; }
+    m_judgeText.setScale(m_judgeScale, m_judgeScale);
+    m_comboText.setScale(m_comboScale, m_comboScale);
 
     // 连击文字（>1 才显示）
     if (m_combo > 1) {
@@ -369,5 +376,6 @@ void RhythmChopLevel::setJudge(const char* zh, const char* en, Color c) {
     m_judgeText.setString(tr(zh, en));
     m_judgeText.setFillColor(c);
     centerText(m_judgeText, config::SCREEN_CENTER_X, 320.0f);
+    m_judgeScale = 1.45f;                  // 弹出：先放大，再在 update 里回弹到 1.0
     m_judgeClock.restart();
 }

@@ -90,6 +90,8 @@ private:
     Text  m_letterText;                // 常驻大号 X（perfect 时放大缩小提示节拍）
     float m_xPulse = 0.0f;             // X 脉冲进度 0~1（perfect 瞬间置 1，随帧衰减）
     Text  m_judgeText, m_comboText;    // 判定文字 / 连击文字
+    float m_judgeScale = 1.0f;         // 判定文字弹出缩放（1.0 = 正常）
+    float m_comboScale = 1.0f;         // 连击文字弹跳缩放
     RectangleShape m_hintBox;          // 提示框（右半边靠下）
     Clock m_judgeClock;                // 判定文字显示计时
 

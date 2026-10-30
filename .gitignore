@@ -388,3 +388,7 @@ highscores.txt
 # 帧耗时诊断日志
 perf.log
 
+
+# Release 直接输出到根目录
+/*.exe
+

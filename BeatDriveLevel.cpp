@@ -110,6 +110,7 @@ void BeatDriveLevel::handleInput(Side side) {
     if (diff <= config::NOTE_GOOD_WINDOW) {                 // 在判定窗口内按＝命中
         const bool perfect = diff <= config::NOTE_PERFECT_WINDOW;
         ++m_combo;
+        m_comboScale = 1.5f;   // 连击数字弹一下
         if (m_combo > m_maxCombo) m_maxCombo = m_combo;
         m_score += perfect ? 100 : 50;
         m_timeRemaining = std::min(config::START_TIME, m_timeRemaining +
@@ -188,6 +189,12 @@ void BeatDriveLevel::update(float dt) {
         }
     }
 
+    // 判定/连击文字回弹（弹出时 >1，逐帧衰减回 1.0）
+    if (m_judgeScale > 1.0f) { m_judgeScale -= dt * 4.5f; if (m_judgeScale < 1.0f) m_judgeScale = 1.0f; }
+    if (m_comboScale > 1.0f) { m_comboScale -= dt * 5.0f; if (m_comboScale < 1.0f) m_comboScale = 1.0f; }
+    m_judgeText.setScale(m_judgeScale, m_judgeScale);
+    m_comboText.setScale(m_comboScale, m_comboScale);
+
     // 连击文字（>1 才显示）
     if (m_combo > 1) {
         m_comboText.setString("x" + std::to_string(m_combo));
@@ -214,6 +221,14 @@ void BeatDriveLevel::advanceBranches() {
     if      (r < l)              m_branches[0] = { Side::Left,  1.0f };
     else if (r < l + rp)         m_branches[0] = { Side::Right, 1.0f };
     else                         m_branches[0] = { Side::None,  1.0f };
+
+    // 特效：每拍在玩家层扬起一点尘土，强化"砸下来"的重量感
+    {
+        const float dustY = (config::RHYTHM_BRANCH_COUNT - 1) * config::RHYTHM_BRANCH_SPACING +
+                            config::RHYTHM_BRANCH_Y_OFFSET;
+        m_game.m_fx.dust(Vector2f(config::NOTE_LEFT_X, dustY), 2);
+        m_game.m_fx.dust(Vector2f(config::NOTE_RIGHT_X, dustY), 2);
+    }
 
     // 字母提示 = 即将压到玩家的树枝（index4，下一拍进入玩家层 index5）的反侧：
     // 该枝在左→提示按右(B)、在右→提示按左(A)、该槽无枝→不显示（进度清零）
@@ -401,5 +416,6 @@ void BeatDriveLevel::setJudge(const char* zh, const char* en, Color c) {
     m_judgeText.setString(tr(zh, en));
     m_judgeText.setFillColor(c);
     centerText(m_judgeText, config::SCREEN_CENTER_X, 320.0f);
+    m_judgeScale = 1.45f;                  // 弹出：先放大，再在 update 里回弹到 1.0
     m_judgeClock.restart();
 }

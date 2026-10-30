@@ -30,6 +30,9 @@
     <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <!-- Release 直接输出到工程根目录：exe 与 SFML DLL、graphics/、fonts/、sound/ 同处一层，
+         双击就能玩，不需要 F5，也不受工作目录影响。Debug 仍留在 Debug\ 供调试。 -->
+    <OutDir>$(ProjectDir)</OutDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

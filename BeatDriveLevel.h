@@ -105,6 +105,8 @@ private:
     Text  m_hintFixed;                 // 固定提示行（双语）
     Text  m_letterText;                // 大号 A / B 字母
     Text  m_judgeText, m_comboText;    // 判定文字 / 连击文字
+    float m_judgeScale = 1.0f;         // 判定文字弹出缩放（1.0 = 正常）
+    float m_comboScale = 1.0f;         // 连击文字弹跳缩放
     RectangleShape m_hintBox;          // 提示框（右半边靠下）
     Clock m_judgeClock;                // 判定文字显示计时
 
