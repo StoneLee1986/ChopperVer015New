@@ -324,8 +324,14 @@ void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
         const Vector2f base = m_tree.getPosition();
         const float beatSec = 60.0f / config::RHYTHM_BPM;
         const float bob = std::sin(6.2831853f * m_beatClock / beatSec) * 3.0f;
-        m_tree.setPosition(base.x, base.y + bob);
-        w.draw(m_tree);        // 树（静态完整树，本关自持）
+        static const float kRockDx[config::ROCK_COUNT] = { 0.0f, 16.0f, -12.0f, 20.0f, -6.0f };
+        for (int r = 0; r < config::ROCK_COUNT; ++r) {
+            Sprite rock(m_game.m_texTree);
+            rock.setOrigin(64.0f, 128.0f);
+            rock.setScale(config::ROCK_SCALE, config::ROCK_SCALE);
+            rock.setPosition(base.x + kRockDx[r], base.y + bob - static_cast<float>(r) * config::ROCK_STEP_Y);
+            w.draw(rock);
+        }
         m_tree.setPosition(base);
     }
 
@@ -335,13 +341,13 @@ void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
         if (m_branches[i].side == Side::None) continue;
         Sprite branch(m_game.m_texBranch);
         branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
-        // 越靠近玩家一槽，树枝放大 +2%（scale 在 advanceBranches 下移时累积）
-        const float scale = m_branches[i].scale;
+        // 越靠近玩家一槽，海草放大 +4%（scale 在 advanceBranches 下移时累积）
+        const float scale = m_branches[i].scale * config::BRANCH_ART_SCALE;
         branch.setScale(scale, scale);
-        // 加 RHYTHM_BRANCH_Y_OFFSET：让压死层(最底槽)贴近小人头顶，消除"树枝远离玩家"的视觉空隙
+        // 加 RHYTHM_BRANCH_Y_OFFSET：让压死层(最底槽)贴近玩家头顶
         const float y = i * config::RHYTHM_BRANCH_SPACING + config::RHYTHM_BRANCH_Y_OFFSET;
-        if (m_branches[i].side == Side::Left) { branch.setPosition(config::NOTE_LEFT_X, y); branch.setRotation(180.0f); }
-        else                                   { branch.setPosition(config::NOTE_RIGHT_X, y); branch.setRotation(0.0f); }
+        branch.setPosition(m_branches[i].side == Side::Left ? config::NOTE_LEFT_X
+                                                            : config::NOTE_RIGHT_X, y);
         w.draw(branch);
 
         // 拖影：向上两层半透明残影，制造"正在往下砸"的速度感（每拍跳一格，靠残影补出运动）

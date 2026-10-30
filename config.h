@@ -119,7 +119,7 @@ namespace config {
 
     // ---- 场景里各元素的固定坐标（对齐原版 Timber!!!：玩家站在树两侧外侧、树枝根部贴树） ----
     constexpr float TREE_X          = 810.0f;   // 树的贴图左上角 X
-    constexpr float PLAYER_Y        = 720.0f;   // 小人脚的 Y 坐标（原版：贴近树底，被树枝压到才判负）
+    constexpr float PLAYER_Y        = 830.0f;   // 潜水员脚底 Y（踩在沙地上）
     constexpr float PLAYER_LEFT_X   = 580.0f;   // 小人站左边时的 X（原版，树枝外侧）
     constexpr float PLAYER_RIGHT_X  = 1200.0f;  // 小人站右边时的 X（原版，树枝外侧）
     constexpr float RIP_Y           = 860.0f;   // 墓碑的 Y 坐标
@@ -133,8 +133,8 @@ namespace config {
 
     // ---- 树枝 ----
     constexpr float  BRANCH_OFFSCREEN = 3000.0f; // 树枝/斧头/圆木隐藏时的 X（移出屏幕）
-    constexpr float  BRANCH_ORIGIN_X = 220.0f;   // 树枝贴图的旋转锚点 X
-    constexpr float  BRANCH_ORIGIN_Y = 20.0f;    // 树枝贴图的旋转锚点 Y
+    constexpr float  BRANCH_ORIGIN_X = 64.0f;    // 海草贴图的锚点 X（128px 贴图的水平中心）
+    constexpr float  BRANCH_ORIGIN_Y = 0.0f;     // 锚点在顶部：海草从上往下垂
 
     // ---- 关卡 1·节奏鼓点的砍树反馈（复现原版 timber.cpp：斧头瞬移换侧 + 单块圆木水平飞出） ----
     constexpr float AXE_SCALE       = 1.6f;      // 斧头放大（152x28 偏小，放大才醒目）
@@ -179,6 +179,13 @@ namespace config {
     constexpr float TREE_ANCHOR_X   = TREE_X + 150.0f;  // 树底部锚点 X = 960（贴图中心）
     constexpr float TREE_GROUND_Y   = 900.0f;           // 树底（贴图高 900，底部固定在地面）
 
+    // ---- 海底主题的美术参数 ----
+    // 中央"石柱"由多块石头叠成（单张石头只有 128px，拉伸会变形）
+    constexpr int   ROCK_COUNT   = 5;       // 叠几块
+    constexpr float ROCK_STEP_Y  = 115.0f;  // 每块之间的垂直间距（小于块高 → 相互重叠成一柱）
+    constexpr float ROCK_SCALE   = 1.9f;    // 单块石头缩放
+    constexpr float BRANCH_ART_SCALE = 1.5f;// 海草相对槽位的显示缩放
+
     // ---- 时间条 ----
     constexpr float START_TIME       = 12.0f;  // 开局 12 秒（鼓点慢，给玩家充足反应时间）
     constexpr float TIME_BAR_WIDTH   = 400.0f; // 时间条满时宽 400 像素
@@ -186,15 +193,16 @@ namespace config {
     constexpr float TIME_BAR_Y      = 980.0f; // 时间条在屏幕底部的 Y
 
     // ---- 资源文件路径（相对可执行文件） ----
-    constexpr const char* ASSET_BACKGROUND = "graphics/background.png"; // 背景图
-    constexpr const char* ASSET_TREE       = "graphics/tree.png";        // 树
-    constexpr const char* ASSET_BEE        = "graphics/bee.png";         // 蜜蜂
-    constexpr const char* ASSET_CLOUD      = "graphics/cloud.png";       // 云彩
-    constexpr const char* ASSET_BRANCH     = "graphics/branch.png";     // 树枝
-    constexpr const char* ASSET_PLAYER     = "graphics/player.png";     // 小人
-    constexpr const char* ASSET_RIP        = "graphics/rip.png";         // 墓碑
-    constexpr const char* ASSET_AXE        = "graphics/axe.png";         // 斧头（挥砍动画）
-    constexpr const char* ASSET_LOG        = "graphics/log.png";         // 圆木（砍下的木屑）
+    // 主题：海底（Kenney Fish Pack + New Platformer Pack，均为 CC0）
+    constexpr const char* ASSET_BACKGROUND = "graphics/fish/bg.png";       // 背景（已烘焙沙地+远景海草）
+    constexpr const char* ASSET_TREE       = "graphics/fish/rock.png";     // 中央石柱（多块叠放）
+    constexpr const char* ASSET_BEE        = "graphics/fish/fish_swim.png";// 游动的鱼（原蜜蜂位）
+    constexpr const char* ASSET_CLOUD      = "graphics/fish/seaweed_bg.png";// 漂动的海草（原云彩位）
+    constexpr const char* ASSET_BRANCH     = "graphics/fish/weed.png";     // 垂下的海草（原树枝）
+    constexpr const char* ASSET_PLAYER     = "graphics/fish/diver.png";    // 潜水员（原小人）
+    constexpr const char* ASSET_RIP        = "graphics/fish/rock_b.png";   // 石头（原墓碑）
+    constexpr const char* ASSET_AXE        = "graphics/fish/bubble.png";   // 气泡（原斧头）
+    constexpr const char* ASSET_LOG        = "graphics/fish/bubble2.png";  // 气泡（原圆木）
     constexpr const char* ASSET_FONT       = "fonts/AlibabaPuHuiTi-3-55-Regular.ttf";     // 字体（阿里巴巴普惠体 3.0 Regular，免费商用，支持中文）
     constexpr const char* ASSET_CHOP_SOUND     = "sound/chop.wav";       // 砍树音效
 

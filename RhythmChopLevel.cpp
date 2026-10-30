@@ -305,8 +305,16 @@ void RhythmChopLevel::renderScene(sf::RenderWindow& w) {
         // 律动：树随每一拍轻微起伏，让画面"在呼吸"
         const float beatSec = 60.0f / config::RHYTHM_BPM;
         const float dy = std::sin(6.2831853f * m_beatClock / beatSec) * 3.0f;
-        m_tree.setPosition(base.x + dx, base.y + dy);
-        w.draw(m_tree);        // 树（静态完整树，本关自持）
+        // 中央石柱：多块石头叠成（单张 128px 拉伸会变形）
+        static const float kRockDx[config::ROCK_COUNT] = { 0.0f, 16.0f, -12.0f, 20.0f, -6.0f };
+        for (int r = 0; r < config::ROCK_COUNT; ++r) {
+            Sprite rock(m_game.m_texTree);
+            rock.setOrigin(64.0f, 128.0f);                      // 底部中心
+            rock.setScale(config::ROCK_SCALE, config::ROCK_SCALE);
+            rock.setPosition(base.x + dx + kRockDx[r],
+                             base.y + dy - static_cast<float>(r) * config::ROCK_STEP_Y);
+            w.draw(rock);
+        }
         m_tree.setPosition(base);
     }
 
@@ -315,10 +323,9 @@ void RhythmChopLevel::renderScene(sf::RenderWindow& w) {
         if (m_branches[i] == Side::None) continue;
         Sprite branch(m_game.m_texBranch);
         branch.setOrigin(config::BRANCH_ORIGIN_X, config::BRANCH_ORIGIN_Y);
-        // 原版树枝无缩放：440 宽、锚点中心，无缩放时端部正好贴住树身（左→830/右→1110）
+        branch.setScale(config::BRANCH_ART_SCALE, config::BRANCH_ART_SCALE);
         const float y = i * config::RHYTHM_BRANCH_SPACING;
-        if (m_branches[i] == Side::Left) { branch.setPosition(config::NOTE_LEFT_X, y); branch.setRotation(180.0f); }
-        else                              { branch.setPosition(config::NOTE_RIGHT_X, y); branch.setRotation(0.0f); }
+        branch.setPosition(m_branches[i] == Side::Left ? config::NOTE_LEFT_X : config::NOTE_RIGHT_X, y);
         w.draw(branch);
     }
 

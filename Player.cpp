@@ -5,8 +5,11 @@
 
 void Player::init(const Texture& texPlayer, const Texture& texRip) {
     m_player.setTexture(texPlayer);
+    m_player.setOrigin(64.0f, 128.0f);      // 脚底中心（潜水员贴图 128x128）
+    m_player.setScale(1.7f, 1.7f);
     m_player.setPosition(config::PLAYER_LEFT_X, config::PLAYER_Y);
     m_rip.setTexture(texRip);
+    m_rip.setOrigin(64.0f, 128.0f);
     m_rip.setPosition(config::RIP_HIDE_X, config::RIP_HIDE_Y);
 }
 
