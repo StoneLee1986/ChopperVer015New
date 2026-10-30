@@ -91,6 +91,7 @@ void RhythmChopLevel::handleInput(Side side) {
 
     // 砍树反馈（原版每次砍都触发）：打击音效 + 单块圆木向反侧飞出
     m_game.m_sound.play();
+    m_treeShake = 1.0f;   // 砍中：树身抖一下
     m_logSpr.setPosition(config::TREE_X, config::RHYTHM_LOG_Y);
     m_logVx = (side == Side::Left ? 1.0f : -1.0f) * config::RHYTHM_LOG_VX;
     m_logVy = config::RHYTHM_LOG_VY;
@@ -157,6 +158,11 @@ void RhythmChopLevel::update(float dt)
     if (m_xPulse > 0.0f) {
         m_xPulse -= dt / 0.15f;
         if (m_xPulse < 0.0f) m_xPulse = 0.0f;
+    }
+    // 树身抖动衰减
+    if (m_treeShake > 0.0f) {
+        m_treeShake -= dt * 6.5f;
+        if (m_treeShake < 0.0f) m_treeShake = 0.0f;
     }
 
     // 砍树动作推进：圆木按水平+垂直初速飞出（原版：水平∓5000 + 向上-1500，无重力）
@@ -243,7 +249,16 @@ void RhythmChopLevel::doGameOver(const sf::String& msg, bool playFailSound) {
 // 画本关全部场景（背景/云/蜜蜂 → 树 → 树枝 → 小人/墓碑 → 圆木 → 斧头）
 void RhythmChopLevel::renderScene(sf::RenderWindow& w) {
     m_scenery.render(w);   // 背景 + 云 + 蜜蜂（最底层）
-    w.draw(m_tree);        // 树（静态完整树，本关自持）
+    // 砍中时树身抖一下（左右 3px，0.15 秒衰减），比整屏震动更像"砍在树上"
+    {
+        const Vector2f base = m_tree.getPosition();
+        if (m_treeShake > 0.0f) {
+            const float dx = std::sin(m_treeShake * 40.0f) * 3.0f * m_treeShake;
+            m_tree.setPosition(base.x + dx, base.y);
+        }
+        w.draw(m_tree);        // 树（静态完整树，本关自持）
+        m_tree.setPosition(base);
+    }
 
     // 下落中的树枝（长在树上，画在树前）
     for (int i = 0; i < config::RHYTHM_BRANCH_COUNT; ++i) {

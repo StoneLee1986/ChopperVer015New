@@ -61,6 +61,11 @@ void Fx::update(float realDt) {
     if (m_flashT < m_flashDur) m_flashT += realDt;
     if (m_beatGlow > 0.0f)     m_beatGlow = std::max(0.0f, m_beatGlow - realDt / 0.18f);
 
+    // 转场与压暗
+    if (m_fadeT < m_fadeDur) m_fadeT += realDt;
+    const float dimTarget = m_dimWanted ? 110.0f : 0.0f;
+    m_dimAlpha += (dimTarget - m_dimAlpha) * std::min(1.0f, realDt * 8.0f);
+
     for (auto& p : m_particles) {
         if (!p.active) continue;
         p.life -= dt;
@@ -124,6 +129,17 @@ void Fx::drawOverlay(sf::RenderTarget& rt) {
     if (m_beatGlow > 0.0f) {
         m_flashRect.setFillColor(sf::Color(255, 255, 255,
                                            static_cast<sf::Uint8>(20.0f * m_beatGlow)));
+        rt.draw(m_flashRect);
+    }
+    // 结算/暂停：整体压暗，让文字和分数更突出
+    if (m_dimAlpha > 0.5f) {
+        m_flashRect.setFillColor(sf::Color(0, 0, 0, static_cast<sf::Uint8>(m_dimAlpha)));
+        rt.draw(m_flashRect);
+    }
+    // 进关卡的黑场淡入（最上层，盖住一切）
+    if (m_fadeT < m_fadeDur) {
+        const float k = 1.0f - std::min(1.0f, m_fadeT / m_fadeDur);
+        m_flashRect.setFillColor(sf::Color(0, 0, 0, static_cast<sf::Uint8>(255.0f * k)));
         rt.draw(m_flashRect);
     }
     if (m_crt) rt.draw(m_scanlines);
@@ -235,4 +251,13 @@ void Fx::hitStop(float dur) {
 void Fx::slowMo(float scale, float dur) {
     m_slowScale = scale;
     m_slowT     = std::max(m_slowT, dur);
+}
+
+void Fx::fadeIn(float dur) {
+    m_fadeT   = 0.0f;
+    m_fadeDur = std::max(0.001f, dur);
+}
+
+void Fx::setDim(bool on) {
+    m_dimWanted = on;
 }

@@ -45,6 +45,8 @@ public:
     void flash(sf::Color c, float dur);
     void hitStop(float dur);
     void slowMo(float scale, float dur);
+    void fadeIn(float dur);        // 从黑场淡入（进关卡时用）
+    void setDim(bool on);          // 结算/暂停时压暗画面（每帧调用即可）
 
 private:
     struct Particle {
@@ -86,6 +88,12 @@ private:
 
     // 鼓点脉冲
     float m_beatGlow = 0.0f;
+
+    // 转场与压暗
+    float m_fadeT     = 0.0f;   // 淡入已进行时间
+    float m_fadeDur   = 0.0f;   // 淡入总时长（0 = 无淡入）
+    bool  m_dimWanted = false;  // 是否要求压暗（结算/暂停）
+    float m_dimAlpha  = 0.0f;   // 当前压暗程度 0~110
 
     // 时间缩放
     float m_hitStopT = 0.0f;

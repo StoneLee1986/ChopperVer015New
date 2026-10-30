@@ -415,6 +415,7 @@ void Game::startNewGame(config::GameMode mode) {
     m_lastTimeRemaining = -1.0f;   // 时间条反馈复位（避免新一局开头误判成"回血"）
     m_timeFlash = 0.0f;
     m_timeBar.setFillColor(Color::Red);
+    m_fx.fadeIn(0.45f);   // 进场：黑场淡入，避免"啪"地一下切进关卡
     if (mode == config::GameMode::ChopRhythm)
         switchBgm(BgmState::LevelA);
     else if (mode == config::GameMode::BeatDrive)
@@ -441,6 +442,7 @@ void Game::enterStage(config::GameMode mode) {
     m_level->stop();   // 准备界面(按 Enter 开始)不播放鼓声；真正开局时 startNewGame 的 onStart 才播放
     setMessage(tr("按回车开始", "Press Enter to Start"));
     switchBgm(BgmState::Menu);
+    m_fx.fadeIn(0.35f);   // 进准备界面也淡入一次
 }
 
 void Game::setMessage(const sf::String& text) {
@@ -724,6 +726,7 @@ void Game::render() {
         return;
     }
     // 关卡场景：整体带屏幕震动偏移（HUD 不跟着抖）
+    m_fx.setDim(m_paused || m_escPaused);    // 结算/暂停时压暗画面
     {
         View shakeView = m_disp.view();
         shakeView.move(m_fx.shakeOffset());

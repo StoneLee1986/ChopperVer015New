@@ -289,6 +289,14 @@ void BeatDriveLevel::renderScene(sf::RenderWindow& w) {
         else                                   { branch.setPosition(config::NOTE_RIGHT_X, y); branch.setRotation(0.0f); }
         w.draw(branch);
 
+        // 拖影：向上两层半透明残影，制造"正在往下砸"的速度感（每拍跳一格，靠残影补出运动）
+        for (int g = 1; g <= 2; ++g) {
+            Sprite ghost = branch;
+            ghost.move(0.0f, -16.0f * static_cast<float>(g));
+            ghost.setColor(Color(255, 255, 255, static_cast<Uint8>(64 / g)));
+            w.draw(ghost);
+        }
+
         // 校对红框：框住字母对应的那根树枝(index4)，粗红框，明暗节奏与字母完全同步（同相位闪烁）
         if (i == pending && m_letterActive) {
             const sf::Vector2u tsz = m_game.m_texBranch.getSize();
