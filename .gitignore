@@ -396,3 +396,8 @@ perf.log
 # 玩法风格存档
 playstyle.txt
 
+
+# 原始素材包（体积大，只保留选中的图）
+assets_src/*
+!assets_src/README.md
+
