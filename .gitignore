@@ -401,3 +401,7 @@ playstyle.txt
 assets_src/*
 !assets_src/README.md
 
+
+# F12 НиЭМ
+shot_*.png
+

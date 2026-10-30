@@ -173,6 +173,16 @@ void Game::processEvents() {
             m_nameUI.appendChar(static_cast<wchar_t>(event.text.unicode));
     }
 
+    // ---- F12 截图（放在所有模态分支之前，任何界面都能截） ----
+    if (Keyboard::isKeyPressed(Keyboard::F12)) {
+        if (!m_shotHeld) {
+            m_shotHeld = true;
+            saveScreenshot();
+        }
+    } else {
+        m_shotHeld = false;
+    }
+
     // ---- "要不要带你打"提示：显示期间冻结游戏，只响应左右+回车 ----
     if (m_assistOffer) {
         const bool l = Keyboard::isKeyPressed(Keyboard::Left);
@@ -598,6 +608,17 @@ void Game::loadStyle() {
 
 void Game::saveStyle() {
     config::savePlayStyle();
+}
+
+// F12：把当前窗口画面存成 PNG（shot_0.png, shot_1.png ...）
+// 用途：AI 看不到玩家的屏幕，但能读图片——存下来就能直接看到真实渲染结果。
+void Game::saveScreenshot() {
+    sf::Texture shot;
+    if (!shot.create(config::SCREEN_WIDTH, config::SCREEN_HEIGHT)) return;
+    shot.update(m_disp.window());
+    const std::string name = "shot_" + std::to_string(m_shotIndex++) + ".png";
+    if (shot.copyToImage().saveToFile(name))
+        std::cerr << "[shot] " << name << "\n";
 }
 
 // 关卡发现玩家一直不打拍子 → 请求弹出"要不要带你打"提示

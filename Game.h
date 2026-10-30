@@ -122,6 +122,9 @@ private:
     // ---- "要不要带你打"提示（玩家一直不打拍子时出现） ----
     bool m_assistOffer     = false;  // 是否正在显示提示（显示期间游戏冻结）
     int  m_assistSelection = 1;      // 0=不用 1=好
+    bool m_shotHeld        = false;  // F12 截图键边沿检测
+    int  m_shotIndex       = 0;      // 截图序号（shot_0.png, shot_1.png ...）
+    void saveScreenshot();           // F12：把当前画面存成 PNG（给 AI 看真实渲染效果）
     void requestAssist();            // 关卡调用：请求弹出提示
     void drawAssistPrompt();         // 画提示框
     void loadStyle();                // 读 playstyle.txt；没读过就进入选择界面
